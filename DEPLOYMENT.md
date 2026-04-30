@@ -320,6 +320,9 @@ cd /rhis/rhis-builder-pipelines
 # Deploy container hosts (for Quadlet/Podman services)
 ./deploy_quadlet_hosts.sh
 
+# Deploy Satellite capsule hosts
+./deploy_sat_capsule_hosts.sh
+
 # Deploy test RHEL hosts
 ./deploy_rhel9_test_hosts.sh
 ./deploy_rhel10_test_hosts.sh
@@ -348,11 +351,11 @@ cd /rhis/rhis-builder-aap
 ./build_aap_standalone_hub.sh
 
 # Build Satellite capsules (multi-stage process)
+# Note: Capsule hosts must be deployed first via rhis-builder-pipelines
 cd /rhis/rhis-builder-satellite
 ./build_sat_1_capsules_satellite_pre.sh   # Prepare Satellite for capsules
-./deploy_sat_capsule_hosts.sh              # Create capsule hosts via Satellite
 ./build_sat_2_capsules.sh                  # Install capsule software
-./build_sat_3_capsules_satellite_post.sh   # Complete Satellite capsule integration
+./build_sat_3_capsules_satellite_post.sh   # Configure replication of content to the Capsules
 ```
 
 See [Detailed Deployment](#detailed-deployment) for step-by-step instructions.
