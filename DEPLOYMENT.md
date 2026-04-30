@@ -1313,9 +1313,12 @@ satellite-maintain backup offline /var/satellite-backup
 
 # Configuration backup
 cd /path/to/rhis-builder-inventory
-git add generated/example.ca/
+git add deployments/example.ca/
 git commit -m "Production deployment configuration"
 git push
+
+# Note: vault/ directory is excluded by .gitignore
+# Ensure vault files are backed up separately to secure location
 ```
 
 ### Monitoring

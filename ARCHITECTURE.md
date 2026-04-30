@@ -238,18 +238,25 @@ RHIS is a comprehensive enterprise infrastructure deployment platform designed f
 ```
 rhis-builder-inventory/
 ├── inventory_template/           # Templates for new deployments
-│   ├── generate_deployment.sh    # Script to generate domain config
 │   ├── group_vars/               # Template group variables
 │   ├── host_vars/                # Template host variables
 │   └── templates/                # Jinja2 templates
-├── generated/                    # Generated deployment configs
+├── inventory_basevars.yml        # Default base variables file
+├── inventory_update.sh           # Script to generate deployment config
+├── deployments/                  # Generated deployment configs
 │   └── <domain>/                 # Per-domain configuration
 │       ├── inventory/            # Ansible inventory
 │       ├── group_vars/           # Domain-specific group vars
 │       ├── host_vars/            # Domain-specific host vars
 │       ├── templates/            # Rendered templates
-│       ├── vault/                # Encrypted secrets
-│       └── launch-container.sh   # Container launch helper
+│       ├── vault/                # Encrypted secrets (never regenerated)
+│       ├── external_tasks/       # Custom playbooks
+│       ├── files/                # Static files (OSCAP, etc.)
+│       └── vars/                 # Additional variable files
+├── vault_SAMPLES/                # Sample vault files
+│   └── rhis_builder_vault_SAMPLE.yml
+├── example.ca.24.sh              # Container launch helper (AAP 2.4)
+├── example.ca.25.sh              # Container launch helper (AAP 2.5)
 └── docs/                         # Documentation
 ```
 
@@ -295,16 +302,25 @@ ENTRYPOINT ["/bin/bash"]
 
 **Runtime**:
 ```bash
-# rhis-builder-inventory generates launch script
-podman run -it \
-  -v /path/to/generated/domain.com:/opt/rhis/inventory:Z \
-  quay.io/parmstro/rhis-provisioner-9:latest
+# Generated launch scripts mount your deployment configuration
+# Use example.ca.25.sh for AAP 2.5+ or example.ca.24.sh for AAP 2.4
+./run_container.sh \
+  --secrets-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/vault \
+  --external-tasks-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/external_tasks \
+  --files-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/files \
+  --group-vars-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/group_vars \
+  --host-vars-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/host_vars \
+  --inventory-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/inventory \
+  --templates-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/templates \
+  --vars-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/vars \
+  --ansible-ver 2.5
 ```
 
 **Inside Container**:
-- All rhis-builder-* roles available
-- Inventory from rhis-builder-inventory mounted
-- Helper scripts to run deployments
+- All rhis-builder-* repositories available at `/rhis/rhis-builder-*/`
+- Inventory mounted at `/rhis/vars/external_inventory/`
+- Vault mounted at `/rhis/vars/vault/`
+- Helper scripts (build_*.sh, deploy_*.sh) in each repository
 - Everything needed for air-gap deployment
 
 ---
@@ -332,7 +348,7 @@ Ansible variable precedence (highest to lowest):
 
 ```
 rhis-builder-inventory/
-└── generated/example.ca/
+└── deployments/example.ca/
     ├── group_vars/
     │   ├── all/                      # Variables for all hosts
     │   │   ├── main.yml              # General settings

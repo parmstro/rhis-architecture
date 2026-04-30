@@ -46,22 +46,31 @@ rhis-architecture/
 ### Deploying RHIS
 
 ```bash
-# 1. Clone rhis-builder-inventory
-git clone https://github.com/parmstro/rhis-builder-inventory
+# 1. Download (not clone) rhis-builder-inventory
+wget https://github.com/parmstro/rhis-builder-inventory/archive/refs/heads/main.zip
+unzip main.zip && mv rhis-builder-inventory-main rhis-builder-inventory
+cd rhis-builder-inventory
 
 # 2. Generate deployment configuration for your domain
-cd rhis-builder-inventory/inventory_template
-./generate_deployment.sh example.ca
+cp inventory_basevars.yml example_ca_basevars.yml
+vim example_ca_basevars.yml  # Edit for your environment
+./inventory_update.sh --basevars-file example_ca_basevars.yml
 
-# 3. Launch the rhis-provisioner container
-cd ../generated/example.ca
-./launch-container.sh
+# 3. Configure secrets
+cd deployments/example.ca/vault
+cp ../../../vault_SAMPLES/rhis_builder_vault_SAMPLE.yml rhis_builder_vault.yml
+vim rhis_builder_vault.yml  # Add your secrets
+ansible-vault encrypt rhis_builder_vault.yml
 
-# 4. Inside container: Deploy infrastructure
-# First: Landing Zone (creates minimal hosts)
-# Second: IdM (authentication, DNS)
-# Third: Satellite (universal provisioner)
-# Fourth: All other services
+# 4. Launch the rhis-provisioner container
+cd ../../..  # Back to rhis-builder-inventory root
+./example.ca.25.sh  # For AAP 2.5+
+
+# 5. Inside container: Deploy infrastructure in order
+# Phase 1: Landing Zone (creates minimal IdM and Satellite hosts)
+# Phase 2: IdM Primary (authentication, DNS, CA) - FIRST SERVICE
+# Phase 3: Satellite Primary (universal provisioner) - SECOND SERVICE  
+# Phase 4: All other services (via Satellite)
 ```
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for complete instructions.

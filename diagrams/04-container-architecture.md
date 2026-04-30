@@ -136,32 +136,52 @@ RUN chmod +x /usr/local/bin/*.sh
 ## Runtime Execution
 
 ### Launch Container
+Use the generated helper script from inventory_update.sh:
 ```bash
-podman run -it \
-  -v /path/to/rhis-builder-inventory/generated/example.ca:/opt/rhis/inventory:Z \
-  --name rhis-provisioner \
-  quay.io/parmstro/rhis-provisioner-9:latest
+cd /path/to/rhis-builder-inventory
+./example.ca.25.sh  # For AAP 2.5+
+# OR
+./example.ca.24.sh  # For AAP 2.4
+
+# This runs:
+./run_container.sh \
+  --secrets-dir deployments/example.ca/vault \
+  --external-tasks-dir deployments/example.ca/external_tasks \
+  --files-dir deployments/example.ca/files \
+  --group-vars-dir deployments/example.ca/group_vars \
+  --host-vars-dir deployments/example.ca/host_vars \
+  --inventory-dir deployments/example.ca/inventory \
+  --templates-dir deployments/example.ca/templates \
+  --vars-dir deployments/example.ca/vars \
+  --ansible-ver 2.5
 ```
 
 ### Inside Container
 ```bash
-# All roles available
-ls /opt/rhis/rhis-builder-*/
+# All rhis-builder-* repositories available
+ls /rhis/rhis-builder-*/
+# rhis-builder-idm/  rhis-builder-satellite/  rhis-builder-aap/  etc.
 
 # Inventory mounted
-ls /opt/rhis/inventory/
-# host_vars/  group_vars/  templates/  vault/  inventory/
+ls /rhis/vars/external_inventory/
+# inventory  group_vars/  host_vars/  templates/  vars/  files/  external_tasks/
 
-# Helper scripts available
-deploy-idm.sh
-deploy-satellite.sh
+# Vault mounted
+ls /rhis/vars/vault/
+# rhis_builder_vault.yml
+
+# Helper scripts in each repository
+cd /rhis/rhis-builder-idm && ls build_*.sh deploy_*.sh
+cd /rhis/rhis-builder-satellite && ls build_*.sh deploy_*.sh
+cd /rhis/rhis-builder-pipelines && ls deploy_*.sh
 ```
 
 ### Environment Variables
 ```bash
-ANSIBLE_CONFIG=/opt/rhis/ansible.cfg
-ANSIBLE_INVENTORY=/opt/rhis/inventory/inventory/hosts.yml
-ANSIBLE_VAULT_PASSWORD_FILE=/opt/rhis/inventory/vault/.vault-pass
+# Default paths used by helper scripts
+ANSIBLE_CONFIG=/rhis/ansible.cfg
+DEFAULT_INVENTORY=/rhis/vars/external_inventory/inventory
+DEFAULT_VAULT_DIR=/rhis/vars/vault
 ```
 
 ## Hermetic Packaging Benefits
@@ -223,9 +243,15 @@ podman build -t rhis-provisioner-9:3.0.0 .
 ### Configuration Updates
 ```bash
 # No container rebuild needed!
-# Just update rhis-builder-inventory and remount
-vim /path/to/rhis-builder-inventory/generated/example.ca/...
-podman run -v /path/to/updated/inventory:/opt/rhis/inventory:Z ...
+# Just update your deployment configuration and relaunch
+vim /path/to/rhis-builder-inventory/deployments/example.ca/group_vars/...
+
+# Or regenerate from basevars
+vim /path/to/rhis-builder-inventory/example_ca_basevars.yml
+./inventory_update.sh --basevars-file example_ca_basevars.yml
+
+# Relaunch container with updated configuration
+./example.ca.25.sh
 ```
 
 ## Security Considerations
