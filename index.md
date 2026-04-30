@@ -13,11 +13,13 @@ description: >-
 
 <div class="project-tagline">Multi-cloud enterprise infrastructure deployment platform with hermetic packaging, identity-first design, and lifecycle automation.</div>
 
-RHIS (Red Hat Infrastructure Standard) is a comprehensive enterprise
+The Red Hat Infrastructure Standard (RHIS) is a comprehensive enterprise
 infrastructure deployment platform. It treats Red Hat Identity Management as
 the foundational identity layer, Red Hat Satellite as the universal provisioner,
+Red Hat Ansible Automation Platform as the universal automation layer
 and packages the entire deployment stack into a hermetic container for
-validation, signing, and air-gap deployment.
+validation, signing, and air-gap deployment. RHIS integrates your Red Hat products into
+a integrated solution to deliver on the promise of Open Hybrid Cloud
 
 Current architecture version: `1.0`  
 Total repositories: `25`
@@ -93,6 +95,12 @@ The critical deployment path that must be followed in order:
 | 4+ | Services | Deploy all other infrastructure (can parallelize) | 10-20 min each |
 
 After Satellite is deployed, all other services provision in parallel through Satellite.
+NOTE: Satellite synchronization time is hightly dependent on your selected content, the 
+horse power of your Satellite Primary, and the network bandwidth available to the system.
+It can range from 10h for an late generation Intel NUC system with 64GB of RAM, 2TB NVMe 
+and only a 1Gb connection disk pulling RHEL 7, 8, 9 and 10 ... To as fast as 30m for 
+64-core DELL server with 256GB of RAM, SAN storage and a trunked 100Gb network connection. 
+Your mileage will vary! 
 
 ## Platform Support
 
@@ -217,14 +225,26 @@ All subsequent services integrate with IdM for identity.
 
 After IdM, Satellite is deployed **second** and becomes the universal provisioner:
 
-- Provisions all infrastructure via hostgroups
-- Manages content (RPMs, containers)
-- Handles subscription lifecycle
+- Complete configuration of all Satellite components
+- Installation
+- Certificate creation
+- Manifest creation and installation
+- Content selection including custom content
+- Content security settings
+- Standard Operating Environment (SOE) definition, including:
+  - Content Lifecycle, views, publication and promotion
+  - Activation key and system purpose definition
+  - Hostgroup definiton
+  - Provisioning configuration for any compute resource
+  - Discovery configuration and rule generation
+  - Compliance Role import and SCAP scanning configuration
+- Infrastructure Management and Network assignment
 - Integrates with IdM for automated enrollment
+- and more
 
 ### Hermetic Container Packaging
 
-The `rhis-provisioner-container` bundles all 25 repositories for:
+The `rhis-provisioner-container` bundles all repositories for:
 
 - Validation and signing of complete stack
 - Air-gap deployment to disconnected environments
@@ -239,6 +259,7 @@ The `rhis-provisioner-container` bundles all 25 repositories for:
 - Template-based deployment generation
 - Ansible Vault for secrets
 - Version-controlled configurations
+- Air gapped deployment pulls together content, container and configuration export.
 
 ## Architecture Diagrams
 
@@ -287,6 +308,7 @@ RHIS delivers strongest value when:
 
 - IdM will be the identity source of truth
 - Satellite will manage the infrastructure lifecycle
+- Ansible Automation Platfrom delivers workflow/pipeline autoamtion
 - Multi-cloud or hybrid deployment is needed
 - Air-gap capability is required
 - Standardized, reproducible deployments are critical
@@ -304,7 +326,7 @@ RHIS delivers strongest value when:
 
 - **Issues**: [Report issues](https://github.com/parmstro/rhis-architecture/issues) in appropriate repository
 - **Contributing**: Follow [contribution guidelines](CONTRIBUTING.html)
-- **Author**: parmstro
+- **Author**: parmstro, heatmiser, shawkingly, redbeard
 - **License**: GPL-3.0 (see individual repositories)
 
 ---

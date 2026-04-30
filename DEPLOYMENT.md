@@ -1,7 +1,7 @@
 # RHIS Deployment Guide
 
 **Complete end-to-end deployment guide for Red Hat Infrastructure Standard**
-
+WARNING... THIS IS NOT ACCURATE YET!!
 ---
 
 ## Table of Contents
@@ -27,7 +27,7 @@
 - Red Hat subscriptions for:
   - RHEL (enough for all systems)
   - Satellite
-  - Ansible Automation Platform (optional)
+  - Ansible Automation Platform (recommended)
 - Cloud credentials (if deploying to AWS/Azure/GCP):
   - AWS: IAM user with appropriate permissions
   - Azure: Service principal
@@ -37,9 +37,30 @@
   - Network configuration capability
   - Storage provisioning
 
+### Required Systems
+
+- a workstation or "provisioner" node
+  - 16GB RAM, 256GB disk, 2 cores
+  - RHEL 9 or equivalent
+  - a persistent provisioner is recommended for enterprise deployments
+  - VSCode remoting can be used to connect from your workstation
+
+- you can provision these manually or use one of the LZ projects to 
+  provision the landing zone components and two bootstrap VMs
+HINT: for POCs, labs, trials, use rhis-builder-baremetal-init. Super simple.
+
+- an IdM Primary node
+  - 16GB RAM, 256GB disk, 2 cores
+  - RHEL 9 or equivalent - minimal installation
+- an Satellite Primary node
+  - 32GB RAM, 1TB fast disk, 4 cores
+  - larger ecosystems require larger satellites
+  - for a disconnected satellite, you will need 3x the space of your library export from your connected satellite
+  - RHEL 9 or equivalent - minimal installation
+
 ### Required Tools
 
-On your workstation:
+On your workstation or provision:
 ```bash
 # Required
 - git
@@ -47,7 +68,7 @@ On your workstation:
 - SSH client
 - Text editor (VS Code recommended)
 
-# Optional but helpful
+# Recommended
 - ansible (for local testing)
 - gh (GitHub CLI)
 ```
@@ -74,39 +95,135 @@ On your workstation:
 
 For experienced users who want to get started immediately:
 
+### 1. Get inventory repository
+You do not want to clone the repository, you want to take a copy
+so that your repository is separate and no one sees the changes but your 
+organization.
 ```bash
-# 1. Clone inventory repository
-git clone https://github.com/parmstro/rhis-builder-inventory
+wget https://github.com/parmstro/rhis-builder-inventory/archive/refs/heads/main.zip
+unzip main.zip
+mv rhis-builder-inventory-main rhis-builder-inventory   # rename it for convenience
 cd rhis-builder-inventory
+git init -b main                                        # you should ensure that the branch is main
+git add * --all
+git commit -m "Initial commit"
+git remote add origin https://github.com/<your_org_or_login>/rhis-builder-inventory.git  # or whatever your url is
+git remote -v
+git push -u origin main
+```
 
-# 2. Generate deployment for your domain
-cd inventory_template
-./generate_deployment.sh yourdomain.com
+### 2. Modify the base vars file and then generate your deployment
+Edit inventory_basevars.yml directly or make a copy e.g. yourdomain_basevars.yml and edit your deployment. 
+Each domain will get its own deployment under the deployments directory.
+```
+cp inventory_basevars.yml example_ca_basevars.yml
+./inventory_update.sh --basevars-file example_ca_basevars.yml
+```
+### 3. Your configuration will be in the deployments directory
+```
+cd deployments/example.ca
+```
+You can modify any of the files in the directories (e.g. host_vars/, group_vars/, inventory/) to customize your deployment.
+This is a good way to start or test your ideas and see what you can produce.
+If you make any mistakes, rerunning the inventory_update helper script will reset the inventory. 
+When you get the feel for what you want to produce, then you want to make changes to the templates and not the generated files.
+This persists your changes and ensures that the settings propagate to any new deployments that you create.
+To work with RHIS in a gitops fashion, we recommend that you edit the template components to ensure that your deployment directory is your source of truth.
 
-# 3. Edit generated configuration
-cd ../generated/yourdomain.com
-# Edit host_vars/, group_vars/, inventory/ with your settings
 
-# 4. Encrypt secrets with Ansible Vault
-ansible-vault create vault/credentials.yml
-# Add: registry credentials, admin passwords, cloud credentials
+### 4. Encrypt secrets with Ansible Vault
+An empty vault directory is created when your deployment is created. 
+This directory is never touched on regeneration of an deployment.
+There is a rhis_builder_vault_SAMPLE.yml file in the vault_SAMPLES directory.
+This has example settings for all the critical vault variables that you will require.
+The sample file is separated into sections so that you know what information is required
+for landing zone creation, IdM deployment, Satellite deployment, AAP deployment and various
+infrastructure component deployments.
+e.g. registry credentials, admin passwords, cloud credentials
+Copy the sample file to your deployments/yourdomain/vault directory and edit the values
+The default gitignore should ensure that it is not copied to your git repo in the cloud.
+Encrypt the file using ansible vault. 
+```
+ansible-vault encrypt rhis_builder_vault.yml
+```
+This is the simplest method and the current default for rhis. Other vaulting solutions are possible. 
 
-# 5. Launch provisioner container
-./launch-container.sh
+### 5. Ensure that you have the latest containers and then launch provisioner container
+Helper scripts ensure that you have up to date containers fetched from quay.io and 
+the inventory_update helper script generates a couple of helper scripts for you to
+launch the container. 
+- yourdomain.24.sh - this is launches a container with the RHIS dependencies for an **AAP 2.4 or earlier** infrastructure
+- yourdomain.25.sh - this is launches a container with the RHIS dependencies for an **AAP 2.5 or later** infrastructure
 
-# 6. Inside container - Deploy in order:
-# a) Landing zone (creates hosts)
-./deploy-landing-zone.sh aws  # or azure, gcp, kvm, baremetal
+We recommend the 2.5 container and the default configuration in the inventory tempates will be configured for latest stable build of Ansible Automation Platform (currently 2.6.x at that time of writing)
 
-# b) IdM (identity and DNS)
-./deploy-idm.sh
+```
+./update_containers.sh
+./example.ca.25.sh
+```
+This launches the container, mounts your inventory and brings your to the command prompt in the container
+You should see something like:
 
-# c) Satellite (universal provisioner)
-./deploy-satellite.sh
+```
+[ansiblerunner@provisioner rhis-builder-inventory]$ ./example.ca.25.sh 
 
-# d) Infrastructure services
-./deploy-nbde.sh
-./deploy-aap.sh
+Launching the rhis-provisioner container with the following parameters:
+external-tasks-dir: /home/ansiblerunner/rhis/rhis-builder-inventory/deployments/example.ca/external_tasks
+files-dir: /home/ansiblerunner/rhis/rhis-builder-inventory/deployments/example.ca/files
+group-vars-dir: /home/ansiblerunner/rhis/rhis-builder-inventory/deployments/example.ca/group_vars
+host-vars-dir: /home/ansiblerunner/rhis/rhis-builder-inventory/deployments/example.ca/host_vars
+inventory-dir: /home/ansiblerunner/rhis/rhis-builder-inventory/deployments/example.ca/inventory
+secrets-dir: /home/ansiblerunner/rhis/rhis-builder-inventory/deployments/example.ca/vault
+templates-dir: /home/ansiblerunner/rhis/rhis-builder-inventory/deployments/example.ca/templates
+vars-dir: /home/ansiblerunner/rhis/rhis-builder-inventory/deployments/example.ca/vars
+ansible-ver: 2.5
+registry: quay.io
+repo: parmstro
+Mounting custom configuration
+##########################################
+Welcome to the RHIS Provisioner container!
+RHIS Build: aniyu
+Provisioner Version: 1.0.91
+From Base Version: 1.0.13
+For AAP Version: 2.5
+RHIS Schema Version: 1.0.0
+[root@provisioner rhis]# 
+```
+
+### 6. Inside container - Deploy in order:
+deploy_ helper scripts typically create systems 
+build_ helper scripts install the software and configure the system
+#### a) Landing zone (creates hosts)
+```bash
+cd /rhis/rhis-builder-(cloud)-lz
+./deploy_landing_zone.sh # or azure, gcp, kvm, baremetal
+```
+#### b) IdM (identity and DNS)
+This builds your first bootstrap system
+```bash
+cd /rhis/rhis-builder-idm
+./build_idm_primary.sh
+```
+#### c) Satellite (universal provisioner)
+This builds your second bootstrap system
+```bash
+cd /rhis/rhis-builder-satellite
+./build_satellite_primary_connected.sh
+```
+
+#### d) Deploy your service nodes
+The rhis-builder-pipelines project contains the core code to deploy system from satellite
+and the code that is used in many of the pipelines within AAP. We deploy our remaining systems
+from here. The deployment definitions are under the group_vars provisioner folder and are based
+on the requirements for building hosts from Satellite hostgroups.
+
+./deploy_aap_hosts.sh
+./deploy_idm_replica_hosts.sh
+./deploy_quadlet_hosts.sh
+./deploy_quadlet_hosts.sh
+
+#### e) Build AAP infrastructure
+
 # ... etc
 ```
 
