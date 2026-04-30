@@ -7,6 +7,12 @@ description: >-
   complete lifecycle automation across AWS, Azure, GCP, KVM, and bare metal.
 ---
 
+<div class="project-eyebrow">Red Hat Infrastructure Standard Documentation</div>
+
+# RHIS Architecture
+
+<div class="project-tagline">Multi-cloud enterprise infrastructure deployment platform with hermetic packaging, identity-first design, and lifecycle automation.</div>
+
 RHIS (Red Hat Infrastructure Standard) is a comprehensive enterprise
 infrastructure deployment platform. It treats Red Hat Identity Management as
 the foundational identity layer, Red Hat Satellite as the universal provisioner,

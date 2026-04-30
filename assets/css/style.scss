@@ -1,0 +1,298 @@
+---
+---
+
+@import "{{ site.theme }}";
+
+/* RHIS Custom Styling - Inspired by Red Hat Design */
+
+:root {
+  --rh-red: #ee0000;
+  --rh-red-dark: #a30000;
+  --rh-red-light: #fce3e3;
+  --rh-sand: #f9f7f4;
+  --rh-gray-10: #f5f5f5;
+  --rh-gray-20: #e0e0e0;
+  --rh-gray-30: #c7c7c7;
+  --rh-gray-50: #8a8d90;
+  --rh-gray-70: #6a6e73;
+  --rh-gray-80: #4d4d4d;
+  --rh-gray-90: #151515;
+  --rh-link: #0066cc;
+}
+
+/* Red Hat Font Imports */
+@import url('https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;700;900&family=Red+Hat+Mono:wght@400;500&family=Red+Hat+Text:wght@400;500;700&display=swap');
+
+/* Body and Base Styles */
+body {
+  font-family: "Red Hat Text", "Helvetica Neue", Arial, sans-serif;
+  background: linear-gradient(180deg, #ffffff 0, #ffffff 12rem, var(--rh-sand) 12rem, var(--rh-sand) 100%);
+  color: var(--rh-gray-90);
+  line-height: 1.6;
+}
+
+/* Override Primer's header */
+.page-header {
+  border-top: 4px solid var(--rh-red);
+  border-bottom: 1px solid var(--rh-gray-20);
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(10px);
+  padding: 1.5rem 0 1.25rem;
+  margin-bottom: 2rem;
+}
+
+/* Site Title/Brand */
+.project-name {
+  margin: 0 0 0.3rem;
+  font-family: "Red Hat Display", "Red Hat Text", Arial, sans-serif;
+  font-size: clamp(2.2rem, 5vw, 3.8rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  color: var(--rh-gray-90);
+}
+
+.project-name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.project-name a:hover {
+  color: var(--rh-red-dark);
+  text-decoration: none;
+}
+
+/* Eyebrow Text */
+.project-eyebrow {
+  margin: 0 0 0.6rem;
+  color: var(--rh-gray-70);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Tagline */
+.project-tagline {
+  margin: 0.4rem 0 1.2rem;
+  max-width: 56rem;
+  color: var(--rh-gray-80);
+  font-size: 1.08rem;
+  font-weight: 400;
+  line-height: 1.5;
+  opacity: 0.95;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Red Hat Display", "Red Hat Text", Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--rh-gray-90);
+}
+
+h1 {
+  font-size: 2.2rem;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid var(--rh-gray-20);
+  padding-bottom: 0.5rem;
+}
+
+h2 {
+  font-size: 1.75rem;
+  margin-top: 2rem;
+  margin-bottom: 0.8rem;
+}
+
+h3 {
+  font-size: 1.4rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.6rem;
+}
+
+/* Links */
+a {
+  color: var(--rh-link);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+a:hover {
+  color: var(--rh-red);
+}
+
+/* Tables - Clean, Technical Style */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.5rem 0;
+  background: #ffffff;
+  border: 1px solid var(--rh-gray-20);
+}
+
+thead {
+  background: var(--rh-gray-10);
+}
+
+th {
+  padding: 0.9rem 1rem;
+  text-align: left;
+  font-family: "Red Hat Text", Arial, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--rh-gray-90);
+  border-bottom: 2px solid var(--rh-gray-30);
+}
+
+td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--rh-gray-20);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+tbody tr:hover {
+  background: var(--rh-sand);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* KBD Styling (for button-like links in tables) */
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.4rem 0.8rem;
+  color: var(--rh-gray-90);
+  background: #ffffff;
+  border: 1px solid var(--rh-gray-80);
+  border-radius: 0;
+  font-family: "Red Hat Text", Arial, sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a kbd {
+  text-decoration: none;
+}
+
+kbd:hover,
+a:hover kbd {
+  color: #ffffff;
+  background: var(--rh-red);
+  border-color: var(--rh-red);
+}
+
+/* Code Blocks */
+code {
+  font-family: "Red Hat Mono", "Courier New", monospace;
+  font-size: 0.9em;
+  background: var(--rh-gray-10);
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+}
+
+pre {
+  font-family: "Red Hat Mono", "Courier New", monospace;
+  background: var(--rh-gray-10);
+  border: 1px solid var(--rh-gray-20);
+  border-radius: 3px;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+}
+
+/* Content Container */
+.main-content {
+  max-width: 900px;
+  padding: 2rem 2.5rem 3rem;
+  margin: 0 auto;
+  background: #ffffff;
+  border: 1px solid var(--rh-gray-20);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+/* Horizontal Rules */
+hr {
+  border: none;
+  border-top: 1px solid var(--rh-gray-20);
+  margin: 2rem 0;
+}
+
+/* Blockquotes */
+blockquote {
+  margin: 1.5rem 0;
+  padding: 0.8rem 1.2rem;
+  border-left: 4px solid var(--rh-red);
+  background: var(--rh-red-light);
+  color: var(--rh-gray-90);
+}
+
+/* Lists */
+ul, ol {
+  line-height: 1.7;
+}
+
+/* Status Badges */
+.status-active {
+  color: #2ea043;
+  font-weight: 600;
+}
+
+.status-deprecated {
+  color: #bf8700;
+  font-weight: 600;
+}
+
+.status-experimental {
+  color: var(--rh-link);
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .project-name {
+    font-size: 2rem;
+  }
+
+  .project-tagline {
+    font-size: 1rem;
+  }
+
+  .main-content {
+    padding: 1.5rem;
+  }
+
+  table {
+    font-size: 0.85rem;
+  }
+
+  th, td {
+    padding: 0.6rem 0.75rem;
+  }
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .page-header {
+    border-top-color: #000000;
+  }
+
+  .project-name {
+    font-size: 2rem;
+  }
+}
