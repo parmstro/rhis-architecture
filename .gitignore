@@ -1,0 +1,37 @@
+# RHIS Architecture Documentation .gitignore
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Editor files
+.vscode/
+.idea/
+*.sublime-*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+ENV/
+
+# Local notes
+notes/
+scratch/
+TODO.local
+
+# Build artifacts
+*.tar.gz
+*.zip
+
+# Secrets (should never be here, but just in case)
+*.vault
+*_vault.yml
+credentials.yml
+secrets.yml
