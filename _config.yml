@@ -1,0 +1,99 @@
+# Jekyll configuration for RHIS Architecture Documentation
+
+title: RHIS Architecture
+description: Red Hat Infrastructure Standard - Central Architecture Documentation
+url: "https://parmstro.github.io"
+baseurl: "/rhis-architecture"
+
+# Theme
+theme: jekyll-theme-cayman
+# Alternative themes:
+# - jekyll-theme-minimal
+# - jekyll-theme-architect
+# - jekyll-theme-slate
+# - jekyll-theme-modernist
+
+# Markdown processor
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+  auto_ids: true
+
+# Plugins
+plugins:
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+  - jekyll-readme-index
+  - jekyll-titles-from-headings
+  - jekyll-github-metadata
+
+# Configuration
+relative_links:
+  enabled: true
+  collections: true
+
+optional_front_matter:
+  remove_originals: false
+
+titles_from_headings:
+  enabled: true
+  strip_title: true
+  collections: true
+
+# GitHub metadata
+repository: parmstro/rhis-architecture
+
+# Navigation
+navigation:
+  - title: Home
+    url: /
+  - title: Architecture
+    url: /ARCHITECTURE.html
+  - title: Repositories
+    url: /REPOSITORIES.html
+  - title: Deployment
+    url: /DEPLOYMENT.html
+  - title: Diagrams
+    url: /diagrams/
+  - title: Contributing
+    url: /CONTRIBUTING.html
+
+# Exclude from processing
+exclude:
+  - .git
+  - .gitignore
+  - scripts/
+  - vendor/
+  - Gemfile
+  - Gemfile.lock
+  - LICENSE
+  - "*.sh"
+
+# Include
+include:
+  - _config.yml
+  - diagrams/
+
+# Collections
+collections:
+  diagrams:
+    output: true
+    permalink: /diagrams/:name/
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"
+  - scope:
+      path: "diagrams"
+    values:
+      layout: "default"
+
+# GitHub specific
+github:
+  repository_url: https://github.com/parmstro/rhis-architecture
+  issues_url: https://github.com/parmstro/rhis-architecture/issues
