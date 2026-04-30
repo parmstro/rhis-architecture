@@ -1,219 +1,308 @@
 ---
 layout: default
-title: RHIS Architecture Documentation
+title: RHIS Architecture
+description: >-
+  Red Hat Infrastructure Standard - Multi-cloud enterprise infrastructure
+  deployment platform with hermetic packaging, identity-first design, and
+  complete lifecycle automation across AWS, Azure, GCP, KVM, and bare metal.
 ---
 
-# RHIS Architecture Documentation
+RHIS (Red Hat Infrastructure Standard) is a comprehensive enterprise
+infrastructure deployment platform. It treats Red Hat Identity Management as
+the foundational identity layer, Red Hat Satellite as the universal provisioner,
+and packages the entire deployment stack into a hermetic container for
+validation, signing, and air-gap deployment.
 
-**Red Hat Infrastructure Standard - Central Architecture Documentation**
+Current architecture version: `1.0`  
+Total repositories: `25`
 
-Welcome to the RHIS architecture documentation. This site provides comprehensive documentation for the RHIS platform - a standardized, automated infrastructure deployment system supporting multi-cloud and on-premise environments.
+## Start Here
+
+Pick the lane that matches your need:
+
+<table>
+  <thead>
+    <tr>
+      <th>Problem</th>
+      <th>Start here</th>
+      <th>Why this page first</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Understanding the complete system</td>
+      <td><a href="ARCHITECTURE.html"><kbd>ARCHITECTURE OVERVIEW</kbd></a></td>
+      <td>Explains design principles, layers, and integration patterns.</td>
+    </tr>
+    <tr>
+      <td>Deploying RHIS from scratch</td>
+      <td><a href="DEPLOYMENT.html"><kbd>DEPLOYMENT GUIDE</kbd></a></td>
+      <td>Step-by-step deployment from landing zone through all services.</td>
+    </tr>
+    <tr>
+      <td>Finding which repository does what</td>
+      <td><a href="REPOSITORIES.html"><kbd>REPOSITORY INVENTORY</kbd></a></td>
+      <td>Complete catalog of all 25 components with status and dependencies.</td>
+    </tr>
+    <tr>
+      <td>Understanding component relationships</td>
+      <td><a href="DEPENDENCIES.html"><kbd>DEPENDENCY GRAPH</kbd></a></td>
+      <td>Shows deploy order, integration points, and critical path.</td>
+    </tr>
+    <tr>
+      <td>Contributing code or improvements</td>
+      <td><a href="CONTRIBUTING.html"><kbd>CONTRIBUTING GUIDE</kbd></a></td>
+      <td>Standards, workflow, and testing requirements.</td>
+    </tr>
+    <tr>
+      <td>Visual architecture overview</td>
+      <td><a href="diagrams/"><kbd>ARCHITECTURE DIAGRAMS</kbd></a></td>
+      <td>Five detailed Mermaid diagrams showing flows and relationships.</td>
+    </tr>
+  </tbody>
+</table>
+
+## How The Docs Work
+
+The documentation follows a layered approach:
+
+- **Architecture** pages for system design, patterns, and technical decisions
+- **Repository** pages for component inventory and capabilities
+- **Deployment** pages for operational procedures and workflows
+- **Diagram** pages for visual representations and data flows
+
+This separation keeps reference material precise while providing operational
+guidance and architectural context separately.
+
+## Core Deployment Flow
+
+The critical deployment path that must be followed in order:
+
+| Phase | Component | Purpose | Duration |
+| --- | --- | --- | --- |
+| 0 | Preparation | Generate config, set up credentials, obtain subscriptions | 1-4 hours |
+| 1 | Landing Zone | Create minimal RHEL 9 hosts for IdM and Satellite | 15-30 min |
+| 2 | IdM Primary | Deploy identity, DNS, CA, Kerberos - **FIRST SERVICE** | 15-30 min |
+| 3 | Satellite | Deploy universal provisioner - **SECOND SERVICE** | 30-60 min |
+| 4+ | Services | Deploy all other infrastructure (can parallelize) | 10-20 min each |
+
+After Satellite is deployed, all other services provision in parallel through Satellite.
+
+## Platform Support
+
+RHIS deploys across five platform types with unified workflow:
+
+<table>
+  <thead>
+    <tr>
+      <th>Platform</th>
+      <th>Landing Zone Repo</th>
+      <th>Status</th>
+      <th>Use When</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>AWS</td>
+      <td><a href="https://github.com/parmstro/rhis-builder-aws-lz">rhis-builder-aws-lz</a></td>
+      <td>✅ Active</td>
+      <td>Deploying to Amazon Web Services</td>
+    </tr>
+    <tr>
+      <td>Azure</td>
+      <td><a href="https://github.com/parmstro/rhis-builder-azure-lz">rhis-builder-azure-lz</a></td>
+      <td>✅ Active</td>
+      <td>Deploying to Microsoft Azure</td>
+    </tr>
+    <tr>
+      <td>GCP</td>
+      <td><a href="https://github.com/parmstro/rhis-builder-google-lz">rhis-builder-google-lz</a></td>
+      <td>✅ Active</td>
+      <td>Deploying to Google Cloud Platform</td>
+    </tr>
+    <tr>
+      <td>KVM</td>
+      <td><a href="https://github.com/parmstro/rhis-builder-kvm-lz">rhis-builder-kvm-lz</a></td>
+      <td>✅ Active</td>
+      <td>On-premise libvirt/KVM hypervisors</td>
+    </tr>
+    <tr>
+      <td>Bare Metal</td>
+      <td><a href="https://github.com/parmstro/rhis-builder-baremetal-init">rhis-builder-baremetal-init</a></td>
+      <td>✅ Active</td>
+      <td>Physical servers with IPMI/BMC</td>
+    </tr>
+  </tbody>
+</table>
+
+## Repository Categories
+
+All 25 RHIS repositories organized by function:
+
+<table>
+  <thead>
+    <tr>
+      <th>Category</th>
+      <th>Count</th>
+      <th>Purpose</th>
+      <th>Documentation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Core Foundation</td>
+      <td>2</td>
+      <td>Configuration repository and execution container</td>
+      <td><a href="REPOSITORIES.html#core-foundation-2-repositories">Details</a></td>
+    </tr>
+    <tr>
+      <td>Landing Zones</td>
+      <td>5</td>
+      <td>Bootstrap minimal RHEL hosts on each platform</td>
+      <td><a href="REPOSITORIES.html#landing-zones-5-repositories">Details</a></td>
+    </tr>
+    <tr>
+      <td>Bootstrap Infrastructure</td>
+      <td>6</td>
+      <td>IdM and Satellite deployment (deploy FIRST)</td>
+      <td><a href="REPOSITORIES.html#core-infrastructure-services-6-repositories">Details</a></td>
+    </tr>
+    <tr>
+      <td>Automation Platform</td>
+      <td>3</td>
+      <td>AAP deployment and operational pipelines</td>
+      <td><a href="REPOSITORIES.html#automation-platform-3-repositories">Details</a></td>
+    </tr>
+    <tr>
+      <td>Security & Identity</td>
+      <td>4</td>
+      <td>NBDE, Keycloak, YubiKey, OSCAP</td>
+      <td><a href="REPOSITORIES.html#security--identity-4-repositories">Details</a></td>
+    </tr>
+    <tr>
+      <td>Lifecycle Management</td>
+      <td>4</td>
+      <td>Convert2RHEL, upgrades, imaging, day-2 ops</td>
+      <td><a href="REPOSITORIES.html#lifecycle-management-4-repositories">Details</a></td>
+    </tr>
+    <tr>
+      <td>Development Tools</td>
+      <td>3</td>
+      <td>Templates and utilities for new components</td>
+      <td><a href="REPOSITORIES.html#development-tools--templates-3-repositories">Details</a></td>
+    </tr>
+  </tbody>
+</table>
+
+## Key Architecture Patterns
+
+### Identity-First Design
+
+Red Hat IdM is deployed **first** and provides:
+
+- Central authentication (Kerberos, LDAP)
+- DNS services for entire infrastructure
+- Certificate authority (PKI)
+- Authorization and policy
+
+All subsequent services integrate with IdM for identity.
+
+### Satellite-Driven Provisioning
+
+After IdM, Satellite is deployed **second** and becomes the universal provisioner:
+
+- Provisions all infrastructure via hostgroups
+- Manages content (RPMs, containers)
+- Handles subscription lifecycle
+- Integrates with IdM for automated enrollment
+
+### Hermetic Container Packaging
+
+The `rhis-provisioner-container` bundles all 25 repositories for:
+
+- Validation and signing of complete stack
+- Air-gap deployment to disconnected environments
+- Reproducible deployments (no runtime fetches)
+- Version-locked component sets
+
+### Configuration as Code
+
+`rhis-builder-inventory` serves as single source of truth:
+
+- Declarative infrastructure definitions
+- Template-based deployment generation
+- Ansible Vault for secrets
+- Version-controlled configurations
+
+## Architecture Diagrams
+
+Five detailed Mermaid diagrams showing system architecture and flows:
+
+<table>
+  <thead>
+    <tr>
+      <th>Diagram</th>
+      <th>Shows</th>
+      <th>Use For</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><a href="diagrams/01-high-level-architecture.html">High-Level Architecture</a></td>
+      <td>Complete platform layers and component relationships</td>
+      <td>Understanding overall system design</td>
+    </tr>
+    <tr>
+      <td><a href="diagrams/02-deployment-flow.html">Deployment Flow</a></td>
+      <td>Step-by-step deployment sequence with timeline</td>
+      <td>Planning and executing deployments</td>
+    </tr>
+    <tr>
+      <td><a href="diagrams/03-dependency-graph.html">Dependency Graph</a></td>
+      <td>All 25 repositories with deploy order</td>
+      <td>Understanding component relationships</td>
+    </tr>
+    <tr>
+      <td><a href="diagrams/04-container-architecture.html">Container Architecture</a></td>
+      <td>Hermetic packaging and layer breakdown</td>
+      <td>Understanding air-gap deployment</td>
+    </tr>
+    <tr>
+      <td><a href="diagrams/05-integration-dataflow.html">Integration & Data Flow</a></td>
+      <td>Service integrations and communication patterns</td>
+      <td>Understanding how services interact</td>
+    </tr>
+  </tbody>
+</table>
+
+## When RHIS Fits Best
+
+RHIS delivers strongest value when:
+
+- IdM will be the identity source of truth
+- Satellite will manage the infrastructure lifecycle
+- Multi-cloud or hybrid deployment is needed
+- Air-gap capability is required
+- Standardized, reproducible deployments are critical
+- Complete platform lifecycle automation is desired
+
+## Getting Started
+
+1. **Plan**: Review [Architecture](ARCHITECTURE.html) and choose your [platform](DEPLOYMENT.html#phase-1-landing-zone)
+2. **Prepare**: Set up credentials, obtain subscriptions, generate [configuration](DEPLOYMENT.html#phase-0-preparation)
+3. **Deploy**: Follow [deployment guide](DEPLOYMENT.html) in order: Landing Zone → IdM → Satellite → Services
+4. **Validate**: Verify each phase before proceeding to next
+5. **Operate**: Use [day-2 operations](https://github.com/parmstro/rhis-builder-day-2-ops) for ongoing management
+
+## Community
+
+- **Issues**: [Report issues](https://github.com/parmstro/rhis-architecture/issues) in appropriate repository
+- **Contributing**: Follow [contribution guidelines](CONTRIBUTING.html)
+- **Author**: parmstro
+- **License**: GPL-3.0 (see individual repositories)
 
 ---
 
-## 📚 Documentation
-
-### Core Documentation
-
-<div class="doc-grid">
-
-#### [Architecture Overview](ARCHITECTURE.md)
-Complete system architecture, design principles, and patterns
-- Multi-layer architecture
-- Identity-first design
-- Hermetic deployment
-- Security architecture
-
-#### [Repository Inventory](REPOSITORIES.md)
-Detailed inventory of all 25 RHIS components
-- Component descriptions
-- Technology stack
-- Status and maturity
-- Documentation coverage
-
-#### [Deployment Guide](DEPLOYMENT.md)
-End-to-end deployment instructions
-- Prerequisites
-- Phase-by-phase deployment
-- Validation procedures
-- Troubleshooting
-
-#### [Dependencies](DEPENDENCIES.md)
-Component relationships and integration points
-- Dependency graph
-- Deploy order
-- External dependencies
-- Critical path
-
-#### [Contributing](CONTRIBUTING.md)
-Development standards and contribution workflow
-- Code standards
-- Testing requirements
-- Review process
-- Community guidelines
-
-</div>
-
----
-
-## 🎨 Architecture Diagrams
-
-Visual representations of the RHIS platform:
-
-- **[High-Level Architecture](diagrams/01-high-level-architecture.md)** - Complete platform overview
-- **[Deployment Flow](diagrams/02-deployment-flow.md)** - Step-by-step deployment sequence
-- **[Dependency Graph](diagrams/03-dependency-graph.md)** - Repository dependencies
-- **[Container Architecture](diagrams/04-container-architecture.md)** - Hermetic packaging
-- **[Integration & Data Flow](diagrams/05-integration-dataflow.md)** - Service integrations
-
-[View all diagrams →](diagrams/)
-
----
-
-## 🚀 Quick Start
-
-### For New Users
-
-1. **Understand the Architecture**
-   - Read [Architecture Overview](ARCHITECTURE.md)
-   - Review [High-Level Diagram](diagrams/01-high-level-architecture.md)
-
-2. **Plan Your Deployment**
-   - Review [Repository Inventory](REPOSITORIES.md)
-   - Check [Deployment Guide](DEPLOYMENT.md) prerequisites
-
-3. **Deploy RHIS**
-   - Follow [Deployment Guide](DEPLOYMENT.md)
-   - Start with landing zone → IdM → Satellite
-
-### For Contributors
-
-1. **Review Standards**
-   - Read [Contributing Guidelines](CONTRIBUTING.md)
-   - Understand [Dependencies](DEPENDENCIES.md)
-
-2. **Set Up Development Environment**
-   - Clone component repository
-   - Install ansible-lint, yamllint
-   - Review best practices
-
-3. **Make Your Contribution**
-   - Create feature branch
-   - Follow naming conventions
-   - Submit pull request
-
----
-
-## 🏗️ Platform Overview
-
-### What is RHIS?
-
-RHIS is a comprehensive enterprise infrastructure deployment platform that provides:
-
-- 🌐 **Multi-Cloud Support**: AWS, Azure, GCP, KVM, Bare Metal
-- 🔒 **Air-Gap Ready**: Hermetic container-based deployment for disconnected environments
-- 🔐 **Identity-First**: Integrated Red Hat Identity Management throughout
-- 📦 **Complete Lifecycle**: Provision → Configure → Secure → Upgrade → Day-2 Operations
-- 🎯 **Satellite-Driven**: Universal provisioning through Red Hat Satellite
-- ✅ **Production-Ready**: Battle-tested enterprise infrastructure patterns
-
-### Components
-
-**25+ repositories** organized into:
-
-- **Landing Zones** (5): AWS, Azure, GCP, KVM, Bare Metal
-- **Core Services** (6): IdM, Satellite, Templates
-- **Automation** (3): AAP, Pipelines, Provisioner
-- **Security** (4): NBDE, Keycloak, YubiKey, OSCAP
-- **Lifecycle** (4): Convert2RHEL, Upgrades, ImageBuilder, Day-2 Ops
-- **Dev Tools** (3): Templates and utilities
-
-### Key Features
-
-#### Identity-First Architecture
-Red Hat Identity Management provides centralized authentication, DNS, and certificates for the entire platform.
-
-#### Satellite-Driven Provisioning
-After IdM deployment, Satellite becomes the universal provisioner for all infrastructure across clouds and on-premise.
-
-#### Hermetic Packaging
-All components bundled into `rhis-provisioner-container` for validation, signing, and air-gap deployment.
-
-#### Configuration as Code
-`rhis-builder-inventory` provides declarative infrastructure definitions with template-based deployment generation.
-
----
-
-## 📊 Architecture Layers
-
-```
-┌─────────────────────────────────────────┐
-│  Application Infrastructure             │
-│  (Customer workloads)                   │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│  Infrastructure Services                │
-│  (AAP, Keycloak, NBDE, OSCAP)          │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│  Universal Provisioner (Satellite)      │
-│  (Compute resources, Hostgroups)        │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│  Identity & DNS (IdM)                   │
-│  (Auth, DNS, CA, Kerberos)             │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│  Compute Platform (Landing Zone)        │
-│  (AWS, Azure, GCP, KVM, Bare Metal)    │
-└─────────────────────────────────────────┘
-```
-
----
-
-## 🔗 Links
-
-- **GitHub Repository**: [parmstro/rhis-architecture](https://github.com/parmstro/rhis-architecture)
-- **Component Repositories**: See [Repository Inventory](REPOSITORIES.md)
-- **Issues**: [Report issues](https://github.com/parmstro/rhis-architecture/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/parmstro/rhis-architecture/discussions)
-
----
-
-## 📝 Recent Updates
-
-- **2026-04-29**: Initial release of architecture documentation
-- **2026-04-29**: Added comprehensive architecture diagrams
-- **2026-04-29**: Created deployment guide and repository inventory
-
----
-
-## 📞 Support
-
-For questions or issues:
-- Review the [Documentation](README.md)
-- Check [Deployment Guide](DEPLOYMENT.md) troubleshooting section
-- Open an [issue](https://github.com/parmstro/rhis-architecture/issues)
-
----
-
-<style>
-.doc-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-  margin: 2rem 0;
-}
-
-.doc-grid h4 {
-  color: #0366d6;
-  margin-top: 0;
-}
-</style>
-
+**Current Documentation Version**: 1.0  
 **Last Updated**: 2026-04-29  
-**Maintained By**: parmstro
+**Platform Status**: Production-Ready

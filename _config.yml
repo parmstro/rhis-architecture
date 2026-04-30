@@ -1,37 +1,40 @@
-# Jekyll configuration for RHIS Architecture Documentation
-
-title: RHIS Architecture
-description: Red Hat Infrastructure Standard - Central Architecture Documentation
+---
+title: "RHIS Architecture"
+brand_title: "RHIS"
+eyebrow: "Red Hat Infrastructure Standard Documentation"
+brand_tagline: >-
+  Multi-cloud enterprise infrastructure deployment platform with
+  hermetic packaging, identity-first design, and lifecycle automation.
+description: >-
+  Comprehensive architecture documentation for RHIS (Red Hat Infrastructure Standard),
+  covering deployment across AWS, Azure, GCP, KVM, and bare metal with
+  integrated identity management, universal provisioning, and complete lifecycle management.
 url: "https://parmstro.github.io"
 baseurl: "/rhis-architecture"
+repo_url: "https://github.com/parmstro/rhis-architecture"
 
 # Theme
-theme: jekyll-theme-cayman
-# Alternative themes:
-# - jekyll-theme-minimal
-# - jekyll-theme-architect
-# - jekyll-theme-slate
-# - jekyll-theme-modernist
+theme: jekyll-theme-primer
 
-# Markdown processor
+# Plugins
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+  - jekyll-titles-from-headings
+
+# Markdown
 markdown: kramdown
 kramdown:
   input: GFM
   syntax_highlighter: rouge
   auto_ids: true
 
-# Plugins
-plugins:
-  - jekyll-relative-links
-  - jekyll-optional-front-matter
-  - jekyll-readme-index
-  - jekyll-titles-from-headings
-  - jekyll-github-metadata
-
 # Configuration
 relative_links:
   enabled: true
-  collections: true
+  collections: false
 
 optional_front_matter:
   remove_originals: false
@@ -39,25 +42,10 @@ optional_front_matter:
 titles_from_headings:
   enabled: true
   strip_title: true
-  collections: true
+  collections: false
 
 # GitHub metadata
 repository: parmstro/rhis-architecture
-
-# Navigation
-navigation:
-  - title: Home
-    url: /
-  - title: Architecture
-    url: /ARCHITECTURE.html
-  - title: Repositories
-    url: /REPOSITORIES.html
-  - title: Deployment
-    url: /DEPLOYMENT.html
-  - title: Diagrams
-    url: /diagrams/
-  - title: Contributing
-    url: /CONTRIBUTING.html
 
 # Exclude from processing
 exclude:
@@ -69,31 +57,9 @@ exclude:
   - Gemfile.lock
   - LICENSE
   - "*.sh"
+  - repos/
 
 # Include
 include:
   - _config.yml
   - diagrams/
-
-# Collections
-collections:
-  diagrams:
-    output: true
-    permalink: /diagrams/:name/
-
-# Defaults
-defaults:
-  - scope:
-      path: ""
-      type: "pages"
-    values:
-      layout: "default"
-  - scope:
-      path: "diagrams"
-    values:
-      layout: "default"
-
-# GitHub specific
-github:
-  repository_url: https://github.com/parmstro/rhis-architecture
-  issues_url: https://github.com/parmstro/rhis-architecture/issues
