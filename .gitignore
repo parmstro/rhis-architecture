@@ -35,3 +35,4 @@ TODO.local
 *_vault.yml
 credentials.yml
 secrets.yml
+.claude/
