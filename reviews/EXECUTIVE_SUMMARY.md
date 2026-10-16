@@ -5,6 +5,11 @@
 **Total Code**: ~1,500 YAML files, ~120 roles  
 **Reviewer**: Claude Code (Sonnet 4.5)
 
+> **Historical Document (as of 2026-10-16)**: This review scanned repos that
+> included a third-party fork (RHIS/, since deleted) and listed several
+> non-existent repositories. Findings may not reflect current state. See
+> REPOSITORIES.md for current verified inventory.
+
 ---
 
 ## Critical Findings

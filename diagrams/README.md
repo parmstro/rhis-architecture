@@ -14,7 +14,7 @@ All diagrams use Mermaid format and render natively on GitHub.
 - Multi-layer architecture visualization
 - Component relationships
 - Deployment order
-- Platform support (AWS, Azure, GCP, KVM, Bare Metal)
+- Platform support (Bare Metal, KVM, AWS, Azure + planned)
 
 **Key Concepts:**
 - Identity-first design with IdM
@@ -44,7 +44,7 @@ All diagrams use Mermaid format and render natively on GitHub.
 ### 3. [Dependency Graph](03-dependency-graph.md)
 **Repository dependencies and relationships**
 
-- All 25 repositories mapped
+- All 28 repositories mapped
 - Deploy order visualization
 - Service-to-service dependencies
 - External dependencies (collections, products)
@@ -178,5 +178,5 @@ Planned additions:
 
 ---
 
-**Last Updated**: 2026-04-29  
+**Last Updated**: 2026-10-16  
 **Total Diagrams**: 5

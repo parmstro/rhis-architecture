@@ -1,579 +1,537 @@
+---
+layout: default
+title: RHIS Repository Inventory
+---
+
 # RHIS Repository Inventory
 
 **Complete inventory of all RHIS (Red Hat Infrastructure Standard) repositories**
 
-Last Updated: 2026-04-29
+Last Updated: 2026-10-16
 
 ---
 
-## Repository Count: 25
+## Repository Summary
+
+| Category | Count | Notes |
+|----------|-------|-------|
+| Core Foundation | 2 | Inventory + provisioner container |
+| Landing Zones | 4 | 3 cloud/hypervisor + 1 bare metal |
+| Core Infrastructure | 3 | IdM, Satellite, Satellite templates |
+| Automation Platform | 2 | AAP, pipelines |
+| Infrastructure Services | 7 | NBDE, Keycloak, YubiKey, Quay, Quadlet, KVM, OCP |
+| Lifecycle Management | 3 | convert2rhel, imagebuilder, day-2-ops |
+| Supporting | 6 | EE testbed, vault sample, UI, maintenance, architecture, MCP |
+| Adoption Model | 1 | RHISAM |
+| **Total** | **28** | |
 
 ---
 
-## Core Foundation (2 repositories)
+## Core Foundation
 
-### rhis-builder-inventory 🔑
+### rhis-builder-inventory
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-inventory`
-- **Purpose**: Central configuration repository and single source of truth
-- **Technology**: Ansible (configuration as code)
-- **Status**: ✅ Active
+- **GitHub**: [parmstro/rhis-builder-inventory](https://github.com/parmstro/rhis-builder-inventory)
+- **Purpose**: Single source of truth for all infrastructure configuration
+- **Status**: Active
 - **Dependencies**: None (keystone repository)
-- **Key Features**:
-  - `inventory_template/` for generating domain-specific deployments
-  - group_vars, host_vars, templates, vault files
-  - Deployment generation script
-  - Reference configurations
-- **Consumed By**: All other rhis-builder-* projects
-- **Documentation**: README.md
+- **Roles**: 0 (configuration data, not automation)
+- **In container**: Yes (cloned at build time)
+- **Key components**:
+  - `inventory_template/` — source-of-truth templates (group_vars, host_vars, Jinja2 templates)
+  - `inventory_update.sh` — renders per-deployment configurations
+  - `deployments/` — generated output (never edited directly)
+  - Band-based IP addressing scheme
+  - Installer inventory templates (growth, enterprise topologies)
+- **Documentation**: README.md, .ansible-lint
 
-### rhis-provisioner / rhis-provisioner-container 🚀
+### rhis-provisioner-container
 
-- **GitHub**: `https://github.com/parmstro/rhis-provisioner-container`
-- **Purpose**: Unified execution environment containing all RHIS components
-- **Technology**: Containers (RHEL UBI 9), Ansible, Python
-- **Status**: ✅ Active
-- **Dependencies**: All rhis-builder-* projects (cloned at build time)
-- **Base Image**: `quay.io/parmstro/rhis-base-9-2.5:latest`
-- **Key Features**:
-  - Hermetic packaging (all dependencies baked in)
-  - Air-gap deployment ready
-  - Symlinked vars for unified configuration
-  - Helper scripts for deployment
-  - Mounts rhis-builder-inventory at runtime
-- **Build Process**: Clones all rhis-builder-* repos at build time
-- **Documentation**: README.md
+- **GitHub**: [parmstro/rhis-provisioner-container](https://github.com/parmstro/rhis-provisioner-container)
+- **Purpose**: Hermetic container aggregating all RHIS components for deployment
+- **Status**: Active
+- **Dependencies**: All rhis-builder-* repos (cloned at build time via `configure_rhis_builder.yml`)
+- **Roles**: 0 (build scripts and playbooks)
+- **In container**: This IS the container
+- **Key components**:
+  - `rhis-base/` — UBI 9/10 base image with Ansible, collections, scanning tools
+  - `rhis-provisioner/` — layered image with all repos, build scripts, deploy scripts
+  - `rhis_build_base.sh`, `rhis_build_provisioner.sh` — container build scripts
+  - Scanning pipeline: Grype, Trivy, ClamAV, Syft, cosign, KICS
+  - `scan_accepted_risks.yml` — CVE accepted risk tracking
+  - `validate_collection_compatibility.yml` — collection version analysis
+- **Build pipeline**: pre-build scan → build → post-build scan → sign → attest → push to quay.io
+- **Documentation**: README.md, .ansible-lint
 
 ---
 
-## Landing Zones (5 repositories)
+## Landing Zones
 
-Create minimal RHEL 9 environments for IdM + Satellite bootstrap.
+Landing zones create minimal RHEL hosts for IdM and Satellite bootstrap.
+A landing zone may perform introspection (discover existing infrastructure),
+build (create using certified Ansible collections), or both.
 
-### rhis-builder-aws-lz
+The goal is to support every compute resource Red Hat Satellite manages.
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-aws-lz`
+### Implemented
+
+#### rhis-builder-bootstrap-init
+
+- **GitHub**: [parmstro/rhis-builder-bootstrap-init](https://github.com/parmstro/rhis-builder-bootstrap-init)
+- **Purpose**: Bare metal initialization — kickstart and OEMDRV generation
+- **Status**: Active
+- **Roles**: 1
+- **In container**: Yes
+- **Documentation**: CLAUDE.md, README.md, .ansible-lint
+
+#### rhis-builder-kvm-lz
+
+- **GitHub**: [parmstro/rhis-builder-kvm-lz](https://github.com/parmstro/rhis-builder-kvm-lz)
+- **Purpose**: Bootstrap RHIS landing zone on KVM/libvirt
+- **Location**: `~/landing_zones/rhis-builder-kvm-lz`
+- **Status**: Active
+- **In container**: Yes
+- **Documentation**: CLAUDE.md, README.md, .ansible-lint
+
+#### rhis-builder-aws-lz
+
+- **GitHub**: [parmstro/rhis-builder-aws-lz](https://github.com/parmstro/rhis-builder-aws-lz)
 - **Purpose**: Bootstrap RHIS landing zone in AWS
-- **Technology**: Ansible, AWS SDK
-- **Status**: ✅ Active
-- **Platform**: Amazon Web Services (AWS)
-- **Dependencies**: rhis-builder-inventory
-- **Key Features**:
-  - VPC creation
-  - EC2 instance provisioning
-  - Security groups and IAM roles
-  - Minimal RHEL 9 for IdM and Satellite
-- **Reference**: [AWS Landing Zone Guidance](https://docs.aws.amazon.com/prescriptive-guidance/latest/strategy-migration/aws-landing-zone.html)
+- **Location**: `~/landing_zones/rhis-builder-aws-lz`
+- **Status**: Active (currently commented out of container build)
+- **In container**: No (commented out in `configure_rhis_builder.yml`)
 - **Documentation**: README.md
 
-### rhis-builder-azure-lz
+#### rhis-builder-azure-lz
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-azure-lz`
+- **GitHub**: [parmstro/rhis-builder-azure-lz](https://github.com/parmstro/rhis-builder-azure-lz)
 - **Purpose**: Bootstrap RHIS landing zone in Azure
-- **Technology**: Ansible, Azure SDK
-- **Status**: ✅ Active
-- **Platform**: Microsoft Azure
-- **Dependencies**: rhis-builder-inventory
-- **Key Features**:
-  - Resource group creation
-  - Virtual network setup
-  - VM provisioning
-  - Minimal RHEL 9 for IdM and Satellite
-- **Reference**: [Azure Landing Zone](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/landing-zone/)
+- **Location**: `~/landing_zones/rhis-builder-azure-lz`
+- **Status**: Active
+- **In container**: Yes
 - **Documentation**: README.md
 
-### rhis-builder-google-lz
+### Planned Landing Zones
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-google-lz`
-- **Purpose**: Bootstrap RHIS landing zone in Google Cloud
-- **Technology**: Ansible, GCP SDK
-- **Status**: ✅ Active
-- **Platform**: Google Cloud Platform (GCP)
-- **Dependencies**: rhis-builder-inventory
-- **Key Features**:
-  - GCP project setup
-  - VPC and subnet creation
-  - Compute Engine instance provisioning
-  - Minimal RHEL 9 for IdM and Satellite
-- **Reference**: [GCP Landing Zone Design](https://cloud.google.com/architecture/landing-zones)
-- **Documentation**: README.md
+Target platforms matching Satellite compute resource support:
 
-### rhis-builder-kvm-lz
-
-- **GitHub**: `https://github.com/parmstro/rhis-builder-kvm-lz`
-- **Purpose**: Bootstrap RHIS landing zone on KVM/libvirt hypervisor
-- **Technology**: Ansible, libvirt
-- **Status**: ✅ Active
-- **Platform**: KVM/libvirt (on-premise)
-- **Dependencies**: rhis-builder-inventory
-- **Key Features**:
-  - libvirt network configuration
-  - VM provisioning via virt-install
-  - Storage pool management
-  - Minimal RHEL 9 for IdM and Satellite
-- **Documentation**: CLAUDE.md, README.md
-
-### rhis-builder-baremetal-init
-
-- **GitHub**: `https://github.com/parmstro/rhis-builder-baremetal-init`
-- **Purpose**: Initialize RHIS on bare metal hardware
-- **Technology**: Ansible, PXE/kickstart
-- **Status**: ✅ Active
-- **Platform**: Physical servers (bare metal)
-- **Dependencies**: rhis-builder-inventory
-- **Key Features**:
-  - IPMI/BMC configuration
-  - PXE boot setup
-  - Initial RHEL 9 installation
-  - Minimal hosts for IdM and Satellite
-- **Documentation**: README.md
+| Platform | Status |
+|----------|--------|
+| Bare metal | Implemented (`bootstrap-init`) |
+| KVM / libvirt | Implemented (`kvm-lz`) |
+| AWS | Implemented (`aws-lz`, not in container build) |
+| Azure | Implemented (`azure-lz`) |
+| VMware | Planned |
+| GCP | Planned |
+| Hyper-V | Planned |
+| Proxmox | Planned |
+| OpenStack | Planned |
+| OpenShift Virtualization | Planned |
+| Azure Local | Planned |
 
 ---
 
-## Core Infrastructure Services (6 repositories)
+## Core Infrastructure Services
 
-Bootstrap services - deployed FIRST before all other infrastructure.
+Deployed first, in order. These bootstrap the platform.
 
-### rhis-builder-idm (Deploy 1st) 🔐
+### rhis-builder-idm (Deploy 1st)
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-idm`
-- **Purpose**: Deploy Red Hat Identity Management primary server
-- **Technology**: Ansible, Red Hat IdM
-- **Status**: ✅ Active
-- **Deploy Order**: **#1 - First service deployed**
-- **Dependencies**: 
-  - `redhat.rhel_idm` Ansible collection
-  - `rhis-builder-inventory`
-- **Key Features**:
-  - Integrated Certificate Authority (CA)
-  - Integrated DNS with dynamic updates
-  - Active Directory trust relationships
-  - User, group, host group management
-  - Sudo command/group/rule configuration
-  - Forward and reverse DNS zones
+- **GitHub**: [parmstro/rhis-builder-idm](https://github.com/parmstro/rhis-builder-idm)
+- **Purpose**: Deploy and configure Red Hat Identity Management
+- **Status**: Active
+- **Deploy order**: 1st — all other services depend on IdM
+- **Roles**: 18
+- **In container**: Yes
+- **Build scripts**: `build_idm_primary.sh`, `build_idm_replicas.sh`
+- **Key features**:
+  - Integrated CA for platform-wide TLS certificates
+  - DNS (forward and reverse zones with dynamic updates)
   - Kerberos realm
-- **Provides**: Authentication, authorization, DNS, certificates for entire RHIS platform
-- **Documentation**: README.md
+  - User, group, host group management
+  - Sudo rules and HBAC policies
+  - Active Directory trust relationships
+- **Collections**: `redhat.rhel_idm`
+- **Documentation**: CLAUDE.md, README.md, .ansible-lint
 
-### rhis-builder-satellite (Deploy 2nd) 📡
+### rhis-builder-satellite (Deploy 2nd)
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-satellite`
-- **Purpose**: Deploy and configure Red Hat Satellite (universal provisioner)
-- **Technology**: Ansible, Red Hat Satellite
-- **Status**: ✅ Active
-- **Deploy Order**: **#2 - Second service deployed (after IdM)**
-- **Dependencies**: rhis-builder-inventory, IdM (must be deployed first)
-- **Key Features**:
-  - Registered as IdM client
-  - `realm-capsule` user via `foreman-prepare-realm`
-  - HTTP service principal in IdM
-  - Certificates from IdM CA
-  - Compute resources: KVM, VMware, GCP, Azure, AWS
-  - Compute profiles: Small, Medium, Large
-  - Hostgroups for each rhis-builder-* system type
+- **GitHub**: [parmstro/rhis-builder-satellite](https://github.com/parmstro/rhis-builder-satellite)
+- **Purpose**: Deploy and configure Red Hat Satellite as universal provisioner
+- **Status**: Active
+- **Deploy order**: 2nd — after IdM, before everything else
+- **Roles**: 56
+- **In container**: Yes
+- **Build scripts**: `build_sat_primary.sh`, `build_sat_1_capsules_satellite_pre.sh`, `build_sat_2_capsules.sh`, `build_sat_3_capsules_satellite_post.sh`, `build_sat_disconnected_export.sh`, `build_sat_disconnected_import.sh`
+- **Key features**:
+  - IdM client with realm integration (`foreman-prepare-realm`)
+  - HTTP service principal and IdM CA certificates
+  - Compute resources for all supported platforms
+  - Compute profiles and hostgroups
   - Content views and lifecycle environments
-- **Role**: Universal provisioner for ALL subsequent infrastructure
-- **Documentation**: README.md
-- **Reference Config**: `host_vars/satellite1.example.ca`
+  - Provisioning templates via GitOps
+  - `pulp_container_optimization` role for container sync performance
+- **Collections**: `redhat.satellite`
+- **Documentation**: README.md, .ansible-lint
 
 ### rhis-builder-satellite-templates
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-satellite-templates`
-- **Purpose**: GitOps for Satellite provisioning templates
-- **Technology**: Satellite foreman_templates plugin, ERB templates
-- **Status**: ✅ Active
-- **Dependencies**: rhis-builder-satellite
-- **Key Features**:
-  - Template synchronization with git
-  - Provisioning templates (kickstart, cloud-init, etc.)
-  - Report templates
-  - Job templates
-  - Template metadata parsing
-- **Pattern**: GitOps - templates stored in git, synced to Satellite
-- **Future**: Template validator for pre-commit validation
-- **Documentation**: README.md
-
-### rhis-builder-satellite-customer
-
-- **GitHub**: Unknown (local only?)
-- **Purpose**: Customer-specific Satellite customizations
-- **Technology**: Ansible
-- **Status**: Unknown
-- **Dependencies**: rhis-builder-satellite
-- **Documentation**: ❌ None found
-- **Note**: Likely customer-specific overrides or extensions
-
-### rhis-builder-satellite-inventory
-
-- **GitHub**: Unknown (local only?)
-- **Purpose**: Satellite-specific inventory management
-- **Technology**: Ansible
-- **Status**: Unknown
-- **Dependencies**: rhis-builder-satellite
-- **Documentation**: ❌ None found
-- **Note**: Possibly Satellite dynamic inventory or host management
+- **GitHub**: [parmstro/rhis-builder-satellite-templates](https://github.com/parmstro/rhis-builder-satellite-templates)
+- **Purpose**: GitOps for Satellite provisioning templates (kickstart, cloud-init, etc.)
+- **Status**: Active
+- **In container**: Not in container (Satellite syncs from git directly)
+- **Key features**:
+  - Template synchronization with Satellite via `foreman_templates` plugin
+  - ERB provisioning templates
+- **Documentation**: README.md, .ansible-lint
 
 ---
 
-## Automation Platform (3 repositories)
+## Automation Platform
 
 ### rhis-builder-aap
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-aap`
+- **GitHub**: [parmstro/rhis-builder-aap](https://github.com/parmstro/rhis-builder-aap)
 - **Purpose**: Deploy and configure Ansible Automation Platform
-- **Technology**: Ansible, AAP installer
-- **Status**: ✅ Active
-- **Dependencies**: rhis-builder-inventory
-- **Key Features**:
-  - AAP controller deployment
-  - Automation mesh configuration
-  - Execution environment setup
-  - Job template creation
-  - Integration with IdM for authentication
-- **Provisioned Via**: Satellite
-- **Documentation**: README.md
+- **Status**: Active
+- **Roles**: 5 (`platform`, `platform_node_pre`, `platform_post`, `hub_post`, `standalone_hub`)
+- **In container**: Yes
+- **Build scripts**: `build_aap_controller.sh`, `build_aap_standalone_hub.sh`, `build_aap24_controller.sh`, `build_aap24_hub.sh`
+- **Key features**:
+  - Container and RPM deployment types
+  - Growth and enterprise topologies
+  - IdM certificate integration (per-node certs via `platform_node_pre`)
+  - Certificate distribution to installer node (`fetch_node_crts.yml`)
+  - Installer inventory template generation
+  - Post-install: job templates, credentials, EE configuration, manifest upload
+  - Gateway as unified API entry point (`aap_gateway_host` variable)
+- **Collections**: `ansible.controller`, `infra.ah_configuration`
+- **Documentation**: README.md, .ansible-lint
 
 ### rhis-builder-pipelines
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-pipelines`
-- **Purpose**: Operational automation workflows and CI/CD
-- **Technology**: Ansible
-- **Status**: ✅ Active
-- **Dependencies**: rhis-builder-inventory, AAP
-- **Contains**:
-  - Sample application deployment content
+- **GitHub**: [parmstro/rhis-builder-pipelines](https://github.com/parmstro/rhis-builder-pipelines)
+- **Purpose**: Operational automation workflows, test content, and CI/CD pipelines
+- **Status**: Active
+- **Roles**: 4 (plus test content roles)
+- **In container**: Yes
+- **Key features**:
+  - Node builder roles for Satellite-driven provisioning
   - VMware operations automation
   - Satellite operations automation
-  - Node builder role
-- **Use Case**: CI/CD pipelines and operational automation
-- **Integration**: Uses many roles from rhis-builder-day-2-ops
-- **Documentation**: README.md
-
-### rhis-builder-aap.bfg-report
-
-- **Purpose**: BFG Repo-Cleaner report artifact
-- **Status**: ⚠️ Artifact (not active code)
-- **Note**: Result of git history cleanup (removed sensitive data)
-- **Action**: Can likely be deleted
+  - Northwind test application deployment content
+  - Uses roles from `rhis-builder-day-2-ops`
+- **Documentation**: README.md, .ansible-lint
 
 ---
 
-## Security & Identity (4 repositories)
+## Infrastructure Services
 
 ### rhis-builder-nbde
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-nbde`
-- **Purpose**: Network Bound Disk Encryption (Tang + Clevis)
-- **Technology**: Ansible, Podman containers, Tang, Clevis
-- **Status**: ✅ Active (currently being improved)
-- **Dependencies**: rhis-builder-inventory
-- **Key Features**:
-  - Tang servers in Podman containers
-  - Systemd integration
+- **GitHub**: [parmstro/rhis-builder-nbde](https://github.com/parmstro/rhis-builder-nbde)
+- **Purpose**: Network Bound Disk Encryption (Tang servers + Clevis clients)
+- **Status**: Active
+- **Roles**: 1 (`tang_container`)
+- **In container**: Yes
+- **Key features**:
+  - Tang servers in Podman containers with systemd integration
+  - Clevis client configuration for automated disk unlock at boot
   - Firewall and SELinux configuration
-  - Clevis client configuration
-  - Automated disk encryption unlock at boot
-  - Deployment verification via clevis encrypt/decrypt test
-- **Components**:
-  - `tang_container` custom role
-  - `rhel-system-roles.nbde_client` upstream role
-- **Provisioned Via**: Satellite
-- **Documentation**: ✅ CLAUDE.md, README.md, BEST_PRACTICES_ANALYSIS.md
-- **Current Work**: Implementing Ansible best practices improvements
+  - Deployment verification via encrypt/decrypt test
+- **Collections**: `containers.podman`, `rhel-system-roles.nbde_client`
+- **Documentation**: README.md, .ansible-lint
 
 ### rhis-builder-keycloak
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-keycloak`
-- **Purpose**: Deploy Keycloak identity broker for applications
-- **Technology**: Ansible, Keycloak
-- **Status**: ✅ Active (container deployment in progress)
-- **Dependencies**: rhis-builder-inventory
-- **Key Features**:
-  - Standalone server deployment
-  - Containerized deployment (in development)
-  - Identity brokering for RHIS applications
-  - SAML/OAuth/OIDC support
+- **GitHub**: [parmstro/rhis-builder-keycloak](https://github.com/parmstro/rhis-builder-keycloak)
+- **Purpose**: Deploy Keycloak identity broker
+- **Status**: Active
+- **Roles**: 2
+- **In container**: Yes
+- **Key features**:
+  - Standalone and containerized deployment options
+  - SAML/OAuth/OIDC identity brokering
   - Integration with IdM
-- **Deployment Options**: Standalone VM or containerized
-- **Provisioned Via**: Satellite
-- **Documentation**: README.md
+- **Documentation**: README.md, .ansible-lint
 
 ### rhis-builder-yubi
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-yubi`
-- **Purpose**: YubiKey integration with Red Hat Identity Manager
-- **Technology**: Ansible, YubiKey, IdM
-- **Status**: ✅ Active
-- **Dependencies**: rhis-builder-inventory, rhis-builder-idm
-- **Key Features**:
+- **GitHub**: [parmstro/rhis-builder-yubi](https://github.com/parmstro/rhis-builder-yubi)
+- **Purpose**: YubiKey hardware token integration with IdM
+- **Status**: Active
+- **Roles**: 2
+- **In container**: Yes
+- **Playbooks**: `initialize_yubikey.yml`, `enable_idm_smartcard_server.yml`, `enable_idm_smartcard_client.yml`
+- **Key features**:
   - YubiKey enrollment in IdM
-  - Two-factor authentication (2FA)
-  - Hardware token authentication
-  - OTP and U2F support
-- **Use Case**: Hardware token authentication for privileged access
-- **Provisioned Via**: Configuration applied to IdM
-- **Documentation**: README.md
+  - Smart card authentication for IdM server and clients
+  - Hardware token 2FA for privileged access
+- **Documentation**: README.md, .ansible-lint
 
-### rhis-builder-oscap
+### rhis-builder-quay
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-oscap`
-- **Purpose**: OpenSCAP security compliance scanning and hardening
-- **Technology**: Ansible, OpenSCAP
-- **Status**: ✅ Active
-- **Dependencies**: rhis-builder-inventory
-- **Roles**:
-  - `rhis-rhel9-cis2` - CIS RHEL 9 Level 2 hardening
-- **Key Features**:
-  - Security compliance scanning
-  - CIS benchmark implementation
-  - Automated remediation
-  - Compliance reporting
-- **Use Case**: Security hardening and compliance validation
-- **Provisioned Via**: Applied post-deployment via AAP
-- **Documentation**: ❌ Limited (roles directory only)
+- **GitHub**: [parmstro/rhis-builder-quay](https://github.com/parmstro/rhis-builder-quay)
+- **Purpose**: Deploy Quay container registry via quadlet pattern
+- **Status**: Active
+- **Roles**: 1
+- **In container**: Yes
+- **Key features**:
+  - Quadlet container deployment on dedicated host
+  - Canonical example of the quadlet deploy pattern
+- **Documentation**: README.md, .ansible-lint
+
+### rhis-builder-quadlet-deploy
+
+- **GitHub**: [parmstro/rhis-builder-quadlet-deploy](https://github.com/parmstro/rhis-builder-quadlet-deploy)
+- **Purpose**: Generic quadlet container deployment pattern
+- **Status**: Active
+- **Roles**: 1
+- **In container**: Yes
+- **Build script**: `build_quadlets.sh`
+- **Key features**:
+  - Deploys containerized services via systemd quadlet
+  - Used for Quay, log aggregation, and other container workloads
+  - Dedicated host + quadlet containers per service model
+- **Documentation**: README.md, .ansible-lint
+
+### rhis-builder-kvm
+
+- **GitHub**: [parmstro/rhis-builder-kvm](https://github.com/parmstro/rhis-builder-kvm)
+- **Purpose**: KVM hypervisor provisioning and configuration
+- **Status**: Active (feature/kvm-iscsi-lvmlock branch)
+- **Roles**: 7
+- **In container**: Yes
+- **Build script**: `build_kvm_hosts.sh`
+- **Key features**:
+  - KVM hypervisor setup and configuration
+  - iSCSI shared storage on Synology NAS (in progress)
+  - LVM lock for shared storage coordination
+- **Documentation**: README.md, .ansible-lint
+
+### rhis-builder-ocp-certs
+
+- **GitHub**: [parmstro/rhis-builder-ocp-certs](https://github.com/parmstro/rhis-builder-ocp-certs)
+- **Purpose**: IdM wildcard certificates for OpenShift Container Platform
+- **Status**: Active
+- **In container**: Yes
+- **Key features**:
+  - Automated wildcard SSL/TLS certificate deployment from IdM
+  - Certificate management for OCP clusters
+- **Documentation**: README.md, .ansible-lint
+
+### rhis-builder-ocp-upi
+
+- **GitHub**: [parmstro/rhis-builder-ocp-upi](https://github.com/parmstro/rhis-builder-ocp-upi)
+- **Purpose**: OpenShift Container Platform UPI deployment with virtualization
+- **Status**: Active
+- **In container**: Yes
+- **Documentation**: README.md, .ansible-lint
 
 ---
 
-## Lifecycle Management (4 repositories)
+## Lifecycle Management
 
 ### rhis-builder-convert2rhel
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-convert2rhel`
+- **GitHub**: [parmstro/rhis-builder-convert2rhel](https://github.com/parmstro/rhis-builder-convert2rhel)
 - **Purpose**: Convert CentOS/Oracle Linux to RHEL
-- **Technology**: Ansible, convert2rhel utility
-- **Status**: ✅ Active
-- **Dependencies**: rhis-builder-inventory, AAP, Satellite
-- **Key Features**:
-  - Automated conversion from CentOS to RHEL
-  - Automated conversion from Oracle Linux to RHEL
+- **Status**: Active
+- **Roles**: 13
+- **In container**: Yes
+- **Key features**:
   - Pre-conversion analysis
-  - Conversion orchestration via AAP
+  - Automated conversion orchestration via AAP
   - Integration with Satellite for subscription management
-- **Use Case**: Migration to RHEL from other Enterprise Linux distributions
-- **Documentation**: README.md
-- **Demo**: Includes AAP and Satellite demo configuration
-
-### rhis-builder-rhelupgrade
-
-- **GitHub**: `https://github.com/parmstro/rhis-builder-rhelupgrade`
-- **Purpose**: Upgrade RHEL between major versions
-- **Technology**: Ansible, leapp upgrade utility
-- **Status**: ✅ Active
-- **Dependencies**: rhis-builder-inventory
-- **Key Features**:
-  - RHEL 7 → 8 upgrades
-  - RHEL 8 → 9 upgrades
-  - Pre-upgrade checks
-  - Post-upgrade validation
-  - Combined with convert2rhel workflows
-- **Use Case**: In-place RHEL major version upgrades
-- **Documentation**: README.md
+- **Documentation**: README.md, .ansible-lint
 
 ### rhis-builder-imagebuilder
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-imagebuilder`
-- **Purpose**: On-premise image building for VMs
-- **Technology**: Ansible, Image Builder (composer)
-- **Status**: ✅ Active
-- **Dependencies**: rhis-builder-inventory
-- **Key Features**:
-  - Build custom RHEL images
-  - Hypervisor image formats (qcow2, vmdk, vhd)
-  - Cloud image formats (AMI, Azure, GCP)
-  - Integration with Satellite compute resources
+- **GitHub**: [parmstro/rhis-builder-imagebuilder](https://github.com/parmstro/rhis-builder-imagebuilder)
+- **Purpose**: On-premise image building with Satellite
+- **Status**: Active
+- **Roles**: 1
+- **In container**: Yes
+- **Key features**:
+  - Custom RHEL image builds via Image Builder (composer)
+  - Multiple output formats (qcow2, vmdk, vhd, AMI, etc.)
   - Blueprint management
-- **Target**: VM images for hypervisors and clouds
-- **Distinction**: Different from `infra.osbuild` (which focuses on rpm-ostree)
-- **Provisioned Via**: Satellite
-- **Documentation**: README.md
+- **Documentation**: README.md, .ansible-lint
 
 ### rhis-builder-day-2-ops
 
-- **GitHub**: `https://github.com/parmstro/rhis-builder-day-2-ops`
-- **Purpose**: Ongoing operations and management (Day N)
-- **Technology**: Ansible
-- **Status**: ✅ Active
-- **Dependencies**: rhis-builder-inventory
-- **Contains**: Playbooks and roles for:
+- **GitHub**: [parmstro/rhis-builder-day-2-ops](https://github.com/parmstro/rhis-builder-day-2-ops)
+- **Purpose**: Day-2 operations automation
+- **Status**: Active
+- **Roles**: 12
+- **In container**: Yes
+- **Key features**:
   - Patching and updates
-  - Backup and restore
-  - Monitoring configuration
-  - Log management
-  - Operational tasks
-- **Integration**: Many roles used in rhis-builder-pipelines
-- **Use Case**: Post-deployment operational automation
+  - Operational task automation
+  - Roles consumed by `rhis-builder-pipelines`
+- **Documentation**: README.md, .ansible-lint
+
+---
+
+## Supporting Repositories
+
+### rhis-builder-ansible-ee
+
+- **GitHub**: [parmstro/rhis-builder-ansible-ee](https://github.com/parmstro/rhis-builder-ansible-ee)
+- **Purpose**: Standalone Execution Environment build testbed
+- **Status**: Active (development/testing only)
+- **In container**: Yes
+- **Note**: NOT the production EE build source. Production EE definitions live in
+  `rhis-builder-inventory/inventory_templates/` and are rendered during the AAP build process.
+- **Documentation**: .ansible-lint
+
+### rhis-builder-vault-SAMPLE
+
+- **GitHub**: [parmstro/rhis-builder-vault-SAMPLE](https://github.com/parmstro/rhis-builder-vault-SAMPLE)
+- **Purpose**: Sample vault files showing required secrets structure
+- **Status**: Active (reference material)
+- **Documentation**: README.md, .ansible-lint
+
+### rhis-builder-ui
+
+- **GitHub**: [parmstro/rhis-builder-ui](https://github.com/parmstro/rhis-builder-ui)
+- **Purpose**: Web UI for RHIS
+- **Status**: In development
+- **Components**: `backend/`, `frontend/`, `Containerfile`
+- **Documentation**: .ansible-lint
+
+### rhis-builder
+
+- **GitHub**: [parmstro/rhis-builder](https://github.com/parmstro/rhis-builder)
+- **Purpose**: Course content and instructional material for the rhis-builder project
+- **Status**: Active (educational content)
+- **Note**: Not an automation repo — contains guided experience content
 - **Documentation**: README.md
 
----
+### rhis-maintenance
 
-## Development Tools & Templates (3 repositories)
+- **Purpose**: Collection usage audit and maintenance scripts
+- **Status**: Active (tooling)
+- **Components**: `audit_collection_usage.py`, `audit_collection_usage.sh`, `cache_collection_docs.py`
 
-### rhis-builder-project-template-files
+### rhis-mcp-server
 
-- **GitHub**: Unknown (local only?)
-- **Purpose**: Template files for creating new rhis-builder-* projects
-- **Technology**: Project templates
-- **Status**: ✅ Active
-- **Dependencies**: None
-- **Contains**:
-  - Standard project structure
-  - Common files (LICENSE, .gitignore, etc.)
-  - README template
-  - Ansible configuration templates
-- **Use Case**: Standardize new repository creation
-- **Documentation**: ❌ None found
-
-### rhis-builder-role-template
-
-- **GitHub**: Unknown (local only?)
-- **Purpose**: Template for creating new Ansible roles
-- **Technology**: Ansible role template
-- **Status**: ✅ Active
-- **Dependencies**: None
-- **Contains**:
-  - Standard role directory structure
-  - meta/main.yml template
-  - meta/argument_specs.yml template
-  - README template
-- **Use Case**: Standardize Ansible role creation
-- **Documentation**: ❌ None found
-
-### rhis-builder-discovery-remaster
-
-- **GitHub**: `https://github.com/parmstro/rhis-builder-discovery-remaster`
-- **Purpose**: Customize Foreman discovery images
-- **Technology**: Ansible, Foreman Discovery
-- **Status**: ⚠️ Partially deprecated (kexec feature)
-- **Dependencies**: rhis-builder-inventory
-- **Key Features**:
-  - Generate custom Foreman discovery images
-  - Originally for kexec-based discovery
-  - Still works for PXE boot customization
-- **Note**: kexec deprecated in future RHEL, but PXE boot customization still valid
+- **GitHub**: [parmstro/rhis-mcp-server](https://github.com/parmstro/rhis-mcp-server) (private)
+- **Purpose**: MCP server and knowledge base for the autonomous monitoring agent
+- **Status**: In development
+- **Components**: `knowledge/{architecture,operations,troubleshooting}/`, confidence schema
 - **Documentation**: README.md
 
+### rhis-architecture
+
+- **GitHub**: [parmstro/rhis-architecture](https://github.com/parmstro/rhis-architecture)
+- **Purpose**: Architecture documentation, diagrams, and review reports
+- **Status**: Active (this repository)
+- **Published**: [parmstro.github.io/rhis-architecture](https://parmstro.github.io/rhis-architecture)
+
+### rhisam
+
+- **GitHub**: [parmstro/rhisam](https://github.com/parmstro/rhisam)
+- **Purpose**: Red Hat Infrastructure Standard Adoption Model documentation
+- **Status**: Early stage
+- **Authors**: Paul Armstrong, Mike Savage
+- **Documentation**: AsciiDoc format, GitHub Pages via AsciiDoctor
+
 ---
 
-## Repository Status Summary
+## Repos Baked into the Provisioner Container
 
-| Status | Count | Description |
-|--------|-------|-------------|
-| ✅ Active | 23 | Production-ready, actively maintained |
-| ⚠️ Artifact | 1 | BFG report (cleanup artifact) |
-| ⚠️ Deprecated | 1 | Partial (discovery-remaster kexec feature) |
-| ❌ Unknown | 3 | Missing documentation (customer, inventory, templates) |
+The following 20 repos are cloned into the container at build time via
+`configure_rhis_builder.yml` (using `ansible.builtin.git`):
+
+| Repository | Branch |
+|---|---|
+| rhis-builder-idm | main |
+| rhis-builder-satellite | main |
+| rhis-builder-pipelines | main |
+| rhis-builder-aap | main |
+| rhis-builder-day-2-ops | main |
+| rhis-builder-nbde | main |
+| rhis-builder-imagebuilder | main |
+| rhis-builder-yubi | main |
+| rhis-builder-convert2rhel | main |
+| rhis-builder-ansible-ee | main |
+| rhis-builder-quadlet-deploy | main |
+| rhis-builder-kvm | feature/kvm-iscsi-lvmlock |
+| rhis-builder-bootstrap-init | main |
+| rhis-builder-azure-lz | main |
+| rhis-builder-keycloak | main |
+| rhis-builder-kvm-lz | main |
+| rhis-builder-ocp-certs | main |
+| rhis-builder-ocp-upi | main |
+| rhis-builder-quay | main |
+| rhis-builder-inventory | (mounted at runtime, not baked) |
+
+`rhis-builder-aws-lz` is currently commented out of the build.
+
+`rhis-builder-inventory` is mounted at runtime from the host, not cloned at
+build time — this allows different deployments to use different configurations
+with the same container image.
 
 ---
 
-## Technology Stack Summary
+## Code Quality Status
+
+### ansible-lint Coverage
+
+21 of 21 Ansible-based repos have `.ansible-lint` configuration (100%).
+
+All repos use the RHIS standard `.ansible-lint` configuration with production profile.
+
+### CLAUDE.md Coverage
+
+| Repository | Has CLAUDE.md |
+|---|---|
+| Workspace root | Yes |
+| rhis-builder-bootstrap-init | Yes |
+| rhis-builder-idm | Yes |
+| rhis-builder-kvm-lz | Yes (in ~/landing_zones/) |
+| All others | No |
+
+### Argument Specifications
+
+No repos currently have `argument_specs.yml` files.
+
+---
+
+## Technology Stack
 
 ### Platforms Supported
-- **Cloud**: AWS, Azure, GCP
-- **On-Premise**: KVM/libvirt, VMware, Bare Metal
-- **Operating System**: RHEL 8.x, RHEL 9.x
+
+- **Implemented**: Bare metal, KVM/libvirt, AWS, Azure
+- **Planned**: VMware, GCP, Hyper-V, Proxmox, OpenStack, OpenShift Virtualization
 
 ### Core Technologies
-- **Automation**: Ansible 2.9+, Ansible Automation Platform
+
+- **Automation**: ansible-core >= 2.14, Ansible Automation Platform 2.6
 - **Identity**: Red Hat Identity Management, Kerberos, LDAP
-- **Provisioning**: Red Hat Satellite
-- **Containers**: Podman, RHEL UBI 9
-- **Security**: NBDE (Tang/Clevis), Keycloak, YubiKey, OpenSCAP
+- **Provisioning**: Red Hat Satellite 6.18
+- **Containers**: Podman, RHEL UBI 9/10
+- **Security**: NBDE (Tang/Clevis), Keycloak, YubiKey
+- **Scanning**: Grype, Trivy, ClamAV, Syft, cosign, KICS
 - **Configuration**: Ansible Vault, Git
 
 ### Ansible Collections Used
+
 - `redhat.rhel_idm`
 - `redhat.satellite`
 - `redhat.rhel_system_roles`
 - `containers.podman`
 - `ansible.posix`
+- `ansible.utils`
 - `community.general`
-- `amazon.aws`
-- `azure.azcollection`
-- `google.cloud`
+- `ansible.controller`
+- `infra.ah_configuration`
+- `amazon.aws` (AWS landing zone)
+- `azure.azcollection` (Azure landing zone)
 
 ---
 
-## Dependency Graph
-
-```
-rhis-builder-inventory (keystone)
-    ↓
-rhis-provisioner-container (clones all)
-    ├── Landing Zones (5)
-    │   ├── aws-lz
-    │   ├── azure-lz
-    │   ├── google-lz
-    │   ├── kvm-lz
-    │   └── baremetal-init
-    │       ↓
-    ├── rhis-builder-idm (FIRST deployment)
-    │       ↓
-    ├── rhis-builder-satellite (SECOND deployment)
-    │   ├── satellite-templates
-    │   ├── satellite-customer
-    │   └── satellite-inventory
-    │       ↓ (provisions all below)
-    ├── Automation (3)
-    │   ├── aap
-    │   └── pipelines
-    ├── Security (4)
-    │   ├── nbde
-    │   ├── keycloak
-    │   ├── yubi
-    │   └── oscap
-    ├── Lifecycle (4)
-    │   ├── convert2rhel
-    │   ├── rhelupgrade
-    │   ├── imagebuilder
-    │   └── day-2-ops
-    └── Dev Tools (3)
-        ├── project-template-files
-        ├── role-template
-        └── discovery-remaster
-```
-
----
-
-## Documentation Status
-
-| Category | README | CLAUDE.md | Best Practices | Argument Specs |
-|----------|--------|-----------|----------------|----------------|
-| Core (2) | 2/2 | 0/2 | 0/2 | 0/2 |
-| Landing Zones (5) | 5/5 | 1/5 | 0/5 | 0/5 |
-| Infrastructure (6) | 4/6 | 0/6 | 0/6 | 0/6 |
-| Automation (3) | 2/3 | 0/3 | 0/3 | 0/3 |
-| Security (4) | 4/4 | 1/4 | 1/4 | 0/4 |
-| Lifecycle (4) | 4/4 | 0/4 | 0/4 | 0/4 |
-| Dev Tools (3) | 1/3 | 0/3 | 0/3 | 0/3 |
-
-**Totals**: 
-- README: 22/27 (81%)
-- CLAUDE.md: 2/27 (7%) ← **Improvement opportunity**
-- Best Practices Analysis: 1/27 (4%) ← **Improvement opportunity**
-- Argument Specs: 0/27 (0%) ← **Improvement opportunity**
-
----
-
-## Recommended Actions
-
-### High Priority
-1. **Add CLAUDE.md** to all repositories (based on nbde pattern)
-2. **Run best practices analysis** on each repository
-3. **Add meta/argument_specs.yml** to all roles
-4. **Document satellite-customer, satellite-inventory, project-template-files**
-
-### Medium Priority
-5. **Standardize .ansible-lint** configuration across all repos
-6. **Add GitHub Actions CI/CD** for linting and testing
-7. **Create role README templates** for consistent documentation
-
-### Low Priority
-8. **Remove rhis-builder-aap.bfg-report** (artifact cleanup)
-9. **Consider archiving deprecated features** (discovery-remaster kexec)
-10. **Migrate to Ansible Collections** (future consideration)
-
----
-
-**Inventory Maintained By**: parmstro  
-**Last Audit**: 2026-04-29  
-**Next Review**: Quarterly
+**Document Version**: 2.0
+**Last Updated**: 2026-10-16
+**Authors**: parmstro, Claude Opus 4.6

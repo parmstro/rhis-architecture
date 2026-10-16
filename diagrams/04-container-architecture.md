@@ -1,3 +1,8 @@
+---
+layout: default
+title: RHIS Container Architecture
+---
+
 # RHIS Container Architecture
 
 ## Hermetic Packaging Strategy
@@ -5,54 +10,48 @@
 ```mermaid
 graph TB
     subgraph "Build Environment (Connected)"
-        BASE[quay.io/parmstro/rhis-base-9-2.5:latest<br/>RHEL UBI 9 + Ansible + Python + Tools]
+        BASE[quay.io/parmstro/rhis-base-9:latest<br/>RHEL UBI 9 + Ansible + Collections + Tools]
         
-        subgraph "Containerfile Build Process"
-            CLONE[Clone all 25 rhis-builder-* repos]
-            SYMLINK[Create unified vars structure<br/>Symlink all project vars to common directory]
-            HELPERS[Add helper scripts]
+        subgraph "Provisioner Build Process"
+            CLONE[configure_rhis_builder.yml<br/>Clones 19 rhis-builder-* repos<br/>via ansible.builtin.git]
+            SCRIPTS[COPY helper scripts<br/>build_*.sh deploy_*.sh run_*.sh<br/>into repo directories]
         end
         
         BUILD[Container Build]
     end
 
-    subgraph "rhis-provisioner-container"
-        ROLES[All rhis-builder-* repositories<br/>- rhis-builder-idm<br/>- rhis-builder-satellite<br/>- rhis-builder-nbde<br/>- ... (all 25)]
-        COMMON[Common vars directory<br/>├── host_vars/ → symlinked<br/>├── group_vars/ → symlinked<br/>├── templates/ → symlinked<br/>├── vault/ → symlinked<br/>└── inventory/ → symlinked]
-        SCRIPTS[Helper scripts<br/>- deploy-landing-zone.sh<br/>- deploy-idm.sh<br/>- deploy-satellite.sh<br/>- etc.]
+    subgraph "rhis-provisioner Container"
+        REPOS[/rhis/rhis-builder-*/<br/>All component repositories<br/>with roles, playbooks, tasks]
+        HELPERS[Helper scripts in each repo<br/>build_idm_primary.sh<br/>deploy_aap_hosts.sh<br/>run_satellite_role.sh<br/>etc.]
     end
 
-    subgraph "Runtime Environment (Potentially Disconnected)"
-        MOUNT[rhis-builder-inventory<br/>mounted at /opt/rhis/inventory]
+    subgraph "Runtime (Potentially Disconnected)"
+        MOUNT[rhis-builder-inventory<br/>deployment mounted at /rhis/vars/]
+        VAULT[Vault secrets<br/>mounted at /rhis/vars/vault/]
         EXEC[Ansible Execution<br/>All dependencies available<br/>No external fetches needed]
     end
 
     subgraph "Air-Gap Transfer"
-        SAVE[podman save → tar file]
-        SNEAKER[Physical media transfer<br/>USB drive, DVD, etc.]
+        SAVE[podman save -> tar file]
+        SNEAKER[Physical media transfer]
         LOAD[podman load from tar]
     end
 
     %% Build flow
     BASE --> BUILD
     BUILD --> CLONE
-    CLONE --> SYMLINK
-    SYMLINK --> HELPERS
-    HELPERS --> ROLES
-    HELPERS --> COMMON
-    HELPERS --> SCRIPTS
+    CLONE --> SCRIPTS
+    SCRIPTS --> REPOS
+    SCRIPTS --> HELPERS
 
     %% Runtime flow
-    ROLES --> EXEC
-    COMMON --> EXEC
-    SCRIPTS --> EXEC
-    MOUNT --> COMMON
+    REPOS --> EXEC
+    HELPERS --> EXEC
     MOUNT --> EXEC
+    VAULT --> EXEC
 
     %% Air-gap flow
-    ROLES --> SAVE
-    COMMON --> SAVE
-    SCRIPTS --> SAVE
+    REPOS --> SAVE
     SAVE --> SNEAKER
     SNEAKER --> LOAD
     LOAD --> EXEC
@@ -63,87 +62,63 @@ graph TB
     classDef runtime fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
     classDef airgap fill:#ffe0b2,stroke:#e65100,stroke-width:2px
 
-    class BASE,CLONE,SYMLINK,HELPERS,BUILD build
-    class ROLES,COMMON,SCRIPTS container
-    class MOUNT,EXEC runtime
+    class BASE,CLONE,SCRIPTS,BUILD build
+    class REPOS,HELPERS container
+    class MOUNT,VAULT,EXEC runtime
     class SAVE,SNEAKER,LOAD airgap
 ```
 
 ## Container Layers
 
-### Layer 1: Base Image
-```dockerfile
-FROM quay.io/parmstro/rhis-base-9-2.5:latest
-```
+### Layer 1: Base Image (`rhis-base`)
 
-**Contains:**
-- RHEL UBI 9 minimal
-- Python 3.9+
-- Ansible core 2.14+
-- All required Python packages (boto3, azure-cli, google-auth, etc.)
-- Binary tools (git, podman, ssh, etc.)
-- All Ansible collections
+Built via `rhis_build_base.sh` from `rhis-base/Containerfile`:
 
-**Size**: ~2-3 GB
+- RHEL UBI 9 (or 10) minimal
+- ansible-core
+- All Ansible collections (from Automation Hub)
+- Python packages from RPMs (`dnf_requirements.txt`)
+- Scanning tools: Grype, Trivy, ClamAV, Syft, cosign, KICS
+- Binary tools: git, SSH, etc.
 
-### Layer 2: RHIS Repositories
-```dockerfile
-# Clone all rhis-builder-* repositories
-RUN git clone --depth 1 https://github.com/parmstro/rhis-builder-idm && \
-    git clone --depth 1 https://github.com/parmstro/rhis-builder-satellite && \
-    # ... all 25 repos
-```
+### Layer 2: Provisioner Image (`rhis-provisioner`)
 
-**Contains:**
-- All rhis-builder-* git repositories
-- Roles, playbooks, tasks
-- Documentation
+Built via `rhis_build_provisioner.sh` from `rhis-provisioner/Containerfile`:
 
-**Additional Size**: ~500 MB
+1. **Repository cloning**: `configure_rhis_builder.yml` clones 19 repos into
+   `/rhis/rhis-builder-*/` using `ansible.builtin.git`
+2. **Script placement**: `COPY` directives place helper scripts into their
+   component directories:
+   - `build_*.sh` -> `/rhis/rhis-builder-<component>/`
+   - `deploy_*.sh` -> `/rhis/rhis-builder-pipelines/`
+   - `run_*_role.sh`, `run_*_task.sh` -> `/rhis/rhis-builder-<component>/`
 
-### Layer 3: Unified Configuration
-```dockerfile
-# Create common vars structure and symlinks
-RUN mkdir -p /opt/rhis/common_vars/{host_vars,group_vars,templates,vault,inventory} && \
-    for project in /opt/rhis/rhis-builder-*/; do \
-        ln -sf /opt/rhis/common_vars/host_vars $project/host_vars; \
-        ln -sf /opt/rhis/common_vars/group_vars $project/group_vars; \
-        # ... etc
-    done
-```
+### Runtime Mounts
 
-**Purpose:**
-- All projects see the same configuration
-- Inventory mounted at runtime maps to all projects
-- No duplication of variables
+The deployment configuration is NOT baked into the container. It is mounted
+at runtime from the host system:
 
-### Layer 4: Helper Scripts
-```dockerfile
-COPY scripts/* /usr/local/bin/
-RUN chmod +x /usr/local/bin/*.sh
-```
+| Host Path | Container Path | Contents |
+|-----------|---------------|----------|
+| `deployments/<domain>/group_vars/` | `/rhis/vars/external_inventory/group_vars/` | Group variables |
+| `deployments/<domain>/host_vars/` | `/rhis/vars/external_inventory/host_vars/` | Host variables |
+| `deployments/<domain>/inventory/` | `/rhis/vars/external_inventory/inventory/` | Inventory file |
+| `deployments/<domain>/templates/` | `/rhis/vars/external_inventory/templates/` | Provisioning templates |
+| `deployments/<domain>/vars/` | `/rhis/vars/external_inventory/vars/` | Additional vars |
+| `deployments/<domain>/files/` | `/rhis/vars/external_inventory/files/` | Static files |
+| `deployments/<domain>/external_tasks/` | `/rhis/vars/external_inventory/external_tasks/` | Custom tasks |
+| `deployments/<domain>/vault/` | `/rhis/vars/vault/` | Encrypted secrets |
 
-**Contains:**
-- Deployment helper scripts
-- Validation utilities
-- Common operations
+This allows the same container image to deploy different environments by
+mounting different deployment configurations.
 
-**Additional Size**: ~10 MB
+## Launch Flow
 
-### Final Container Size
-**Total**: ~3-4 GB (compressed: ~1-2 GB)
-
-## Runtime Execution
-
-### Launch Container
-Use the generated helper script from inventory_update.sh:
 ```bash
-cd /path/to/rhis-builder-inventory
-./example.ca.25.sh  # For AAP 2.5+
-# OR
-./example.ca.24.sh  # For AAP 2.4
+# Generated by inventory_update.sh
+./example.ca.25.sh
 
-# This runs:
+# Calls run_container.sh with mount parameters:
 ./run_container.sh \
   --secrets-dir deployments/example.ca/vault \
   --external-tasks-dir deployments/example.ca/external_tasks \
@@ -156,127 +131,52 @@ cd /path/to/rhis-builder-inventory
   --ansible-ver 2.5
 ```
 
-### Inside Container
-```bash
-# All rhis-builder-* repositories available
-ls /rhis/rhis-builder-*/
-# rhis-builder-idm/  rhis-builder-satellite/  rhis-builder-aap/  etc.
+## Inside the Container
 
-# Inventory mounted
-ls /rhis/vars/external_inventory/
-# inventory  group_vars/  host_vars/  templates/  vars/  files/  external_tasks/
-
-# Vault mounted
-ls /rhis/vars/vault/
-# rhis_builder_vault.yml
-
-# Helper scripts in each repository
-cd /rhis/rhis-builder-idm && ls build_*.sh deploy_*.sh
-cd /rhis/rhis-builder-satellite && ls build_*.sh deploy_*.sh
-cd /rhis/rhis-builder-pipelines && ls deploy_*.sh
+```
+/rhis/
+├── rhis-builder-idm/          # IdM roles + build_idm_primary.sh
+├── rhis-builder-satellite/    # Satellite roles + build_sat_primary.sh
+├── rhis-builder-aap/          # AAP roles + build_aap_controller.sh
+├── rhis-builder-pipelines/    # Deploy scripts + operational roles
+├── rhis-builder-nbde/         # NBDE roles
+├── rhis-builder-kvm/          # KVM roles + build_kvm_hosts.sh
+├── rhis-builder-quadlet-deploy/ # Quadlet roles + build_quadlets.sh
+├── ... (19 repos total)
+├── vars/
+│   ├── external_inventory/    # Mounted deployment config
+│   └── vault/                 # Mounted secrets
+├── ansible.cfg                # Ansible configuration
+└── configure_rhis_builder.yml # Build-time playbook
 ```
 
-### Environment Variables
-```bash
-# Default paths used by helper scripts
-ANSIBLE_CONFIG=/rhis/ansible.cfg
-DEFAULT_INVENTORY=/rhis/vars/external_inventory/inventory
-DEFAULT_VAULT_DIR=/rhis/vars/vault
+## Build Pipeline
+
 ```
+Pre-build scan (lint + vuln check)
+    |
+Container build (base then provisioner)
+    |
+Post-build scan (Grype, Trivy, ClamAV)
+    |
+Sign (cosign keyless via Sigstore)
+    |
+Attest (SBOM + vulnerability scan)
+    |
+Push to quay.io
+```
+
+Policy enforcement blocks pushes when unaccepted high/critical CVEs are found.
+Accepted risks are tracked in `scan_accepted_risks.yml` with review-by dates.
 
 ## Hermetic Packaging Benefits
 
-### 1. Validation & Signing
-```
-Build container → Test complete stack → Sign image → Distribute
-```
-
-All components tested together as a unit.
-
-### 2. Air-Gap Deployment
-```
-Connected environment:
-  podman save rhis-provisioner-9:latest -o rhis.tar
-
-Transfer via physical media
-
-Disconnected environment:
-  podman load -i rhis.tar
-  podman run ...
-```
-
-No runtime dependencies on external networks.
-
-### 3. Reproducible Deployments
-- Exact same code versions every time
-- No "works on my machine" issues
-- Consistent across all environments
-
-### 4. Version Management
-```
-quay.io/parmstro/rhis-provisioner-9:2.5.0  ← Specific tested version
-quay.io/parmstro/rhis-provisioner-9:latest  ← Rolling latest
-```
-
-Version tags include:
-- Base OS version (9)
-- RHIS version (2.5.0)
-- Git commit hash (optional)
-
-## Update Strategy
-
-### Minor Updates (Code Changes)
-```bash
-# Rebuild container with new code
-git pull  # Update rhis-builder-* repos
-podman build -t rhis-provisioner-9:2.5.1 .
-```
-
-### Major Updates (Base Image)
-```bash
-# Update base image first
-podman build -f Containerfile.base -t rhis-base-9-3.0 .
-# Then rebuild provisioner
-podman build -t rhis-provisioner-9:3.0.0 .
-```
-
-### Configuration Updates
-```bash
-# No container rebuild needed!
-# Just update your deployment configuration and relaunch
-vim /path/to/rhis-builder-inventory/deployments/example.ca/group_vars/...
-
-# Or regenerate from basevars
-vim /path/to/rhis-builder-inventory/example_ca_basevars.yml
-./inventory_update.sh --basevars-file example_ca_basevars.yml
-
-# Relaunch container with updated configuration
-./example.ca.25.sh
-```
-
-## Security Considerations
-
-### Image Scanning
-```bash
-# Scan for vulnerabilities
-podman scan rhis-provisioner-9:latest
-
-# Sign image after validation
-podman sign rhis-provisioner-9:2.5.0
-```
-
-### Minimal Attack Surface
-- Based on RHEL UBI 9 (minimal)
-- Only necessary packages installed
-- No unnecessary services running
-- Regular security updates to base image
-
-### Secrets Management
-- Secrets in rhis-builder-inventory (not in container)
-- Ansible Vault for encryption
-- Mounted at runtime (not baked in)
-- No secrets in container image
+1. **Air-gap deployment**: `podman save` / `podman load` for disconnected transfer
+2. **Reproducibility**: Exact same code versions every deployment
+3. **Validation**: Complete stack scanned and signed as a unit
+4. **Configuration separation**: Same container, different deployments via mounts
 
 ---
 
-**Last Updated**: 2026-04-29
+**Document Version**: 2.0
+**Last Updated**: 2026-10-16

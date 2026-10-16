@@ -1,3 +1,8 @@
+---
+layout: default
+title: RHIS Integration and Data Flow
+---
+
 # RHIS Integration and Data Flow
 
 ## Identity and Authentication Flow
@@ -52,13 +57,12 @@ graph TB
 
     subgraph "Red Hat IdM"
         IDM_DNS[DNS Service]
-        IDM_DHCP[DHCP Reservation]
         IDM_HOST[Host Entry]
         IDM_REALM[Realm Service]
     end
 
     subgraph "Compute Resource"
-        CR[Compute Resource<br/>AWS/Azure/GCP/KVM/VMware]
+        CR[Compute Resource<br/>KVM/VMware/AWS/Azure]
         VM[New VM/Instance]
     end
 
@@ -101,9 +105,34 @@ graph TB
 
     class ADMIN,SAT_UI admin
     class SAT,TFTP,TMPL,DNS satellite
-    class IDM_DNS,IDM_DHCP,IDM_HOST,IDM_REALM idm
+    class IDM_DNS,IDM_HOST,IDM_REALM idm
     class CR,VM compute
     class PXE,KS,OS,REG,IPA,CFG boot
+```
+
+## AAP TLS Certificate Flow
+
+```mermaid
+sequenceDiagram
+    participant IdM as Red Hat IdM CA
+    participant Node as AAP Node
+    participant Installer as AAP Installer Node
+    participant AAP as AAP Installer
+
+    Note over Node: platform_node_pre role
+    Node->>IdM: ipa service-add HTTP/<fqdn>
+    Node->>IdM: ipa-getcert request
+    IdM-->>Node: Certificate issued to<br/>platform_ssl_certs_base_dir/<fqdn>/
+
+    Note over Installer: fetch_node_crts.yml
+    Node->>Installer: SCP certificates to installer
+    Note over Installer: All node certs now at<br/>base_dir/<fqdn>/<fqdn>.crt|key
+
+    Note over Installer: platform_installer_config
+    Installer->>Installer: Generate installer inventory<br/>with per-component cert paths
+
+    Installer->>AAP: Launch installer
+    AAP->>AAP: Install with IdM TLS certs
 ```
 
 ## Service Integration Map
@@ -111,25 +140,23 @@ graph TB
 ```mermaid
 graph TB
     subgraph "Identity Layer"
-        IDM[Red Hat IdM<br/>🔐]
-        KC[Keycloak<br/>🎫]
-        YUBI[YubiKey<br/>🔑]
+        IDM[Red Hat IdM]
+        KC[Keycloak]
+        YUBI[YubiKey]
     end
 
     subgraph "Management Layer"
-        SAT[Satellite<br/>📡]
-        AAP[Automation Platform<br/>🤖]
+        SAT[Satellite]
+        AAP[Automation Platform]
     end
 
     subgraph "Security Layer"
-        NBDE[NBDE/Tang<br/>🔒]
-        OSCAP[OSCAP<br/>✅]
+        NBDE[NBDE/Tang]
     end
 
     subgraph "Application Layer"
         APP1[Application 1]
         APP2[Application 2]
-        APP3[Application 3]
     end
 
     subgraph "Infrastructure Layer"
@@ -160,26 +187,18 @@ graph TB
     AAP -->|Configures| HOST3
     AAP -->|Deploys| APP1
     AAP -->|Deploys| APP2
-    AAP -->|Deploys| APP3
 
     %% Security integrations
     NBDE -->|Encrypts Disks| HOST1
     NBDE -->|Encrypts Disks| HOST2
     NBDE -->|Encrypts Disks| HOST3
-    
-    OSCAP -->|Scans| HOST1
-    OSCAP -->|Scans| HOST2
-    OSCAP -->|Scans| HOST3
-    OSCAP -->|Reports to| SAT
 
     %% Application integrations
     KC -->|SSO| APP1
     KC -->|SSO| APP2
-    KC -->|SSO| APP3
     
     APP1 -->|Runs on| HOST1
     APP2 -->|Runs on| HOST2
-    APP3 -->|Runs on| HOST3
 
     %% Host identity
     HOST1 -->|Enrolled in| IDM
@@ -195,8 +214,8 @@ graph TB
 
     class IDM,KC,YUBI identity
     class SAT,AAP management
-    class NBDE,OSCAP security
-    class APP1,APP2,APP3 application
+    class NBDE security
+    class APP1,APP2 application
     class HOST1,HOST2,HOST3 infrastructure
 ```
 
@@ -205,22 +224,29 @@ graph TB
 ### Configuration Data
 ```
 rhis-builder-inventory (Git)
-  ├── host_vars/           → Host-specific config
-  ├── group_vars/          → Group config
-  ├── templates/           → Jinja2 templates
-  └── vault/               → Encrypted secrets
+  ├── inventory_template/    -> Source of truth templates
+  ├── deployments/<domain>/  -> Rendered output (never edit directly)
+  │   ├── host_vars/
+  │   ├── group_vars/
+  │   ├── inventory/
+  │   ├── templates/
+  │   ├── vars/
+  │   ├── files/
+  │   ├── external_tasks/
+  │   └── vault/             -> Encrypted secrets (never regenerated)
+  └── inventory_update.sh    -> Renders templates to deployments
 
-Mounted into: rhis-provisioner-container
+Mounted into container at /rhis/vars/
 ```
 
 ### Identity Data
 ```
 Red Hat IdM (389 Directory Server)
-  ├── Users and Groups     → LDAP directory
-  ├── DNS Zones            → BIND backend
-  ├── Certificates         → Dogtag CA
-  ├── Kerberos Principals  → KDC database
-  └── Sudo Rules           → LDAP entries
+  ├── Users and Groups     -> LDAP directory
+  ├── DNS Zones            -> BIND backend
+  ├── Certificates         -> Dogtag CA
+  ├── Kerberos Principals  -> KDC database
+  └── Sudo Rules           -> LDAP entries
 
 Replicated to: IdM replicas (multi-master)
 Backed up via: ipa-backup
@@ -229,63 +255,61 @@ Backed up via: ipa-backup
 ### Infrastructure Data
 ```
 Red Hat Satellite (PostgreSQL)
-  ├── Hosts                → Inventory
-  ├── Content Views        → Package metadata
-  ├── Activation Keys      → Subscription data
-  ├── Provisioning Config  → Templates, profiles
-  └── Reports              → Audit logs
+  ├── Hosts                -> Inventory
+  ├── Content Views        -> Package metadata
+  ├── Activation Keys      -> Subscription data
+  ├── Provisioning Config  -> Templates, profiles
+  └── Reports              -> Audit logs
 
 Backed up via: satellite-maintain backup
-Content stored: /var/lib/pulp (separate volume)
+Content stored: /var/lib/pulp (separate volume recommended)
 ```
 
 ### Automation Data
 ```
 Ansible Automation Platform (PostgreSQL)
-  ├── Job Templates        → Automation definitions
-  ├── Inventories          → Host lists (synced from Satellite)
-  ├── Credentials          → Encrypted secrets
-  ├── Projects             → Git repo references
-  └── Job History          → Execution logs
-
-Backed up via: Database dumps + project configs
+  ├── Job Templates        -> Automation definitions
+  ├── Inventories          -> Host lists (synced from Satellite)
+  ├── Credentials          -> Encrypted secrets
+  ├── Projects             -> Git repo references
+  └── Job History          -> Execution logs
 ```
 
 ## Network Communication Patterns
 
 ### Management Traffic
 ```
-Administrator → Satellite (443/tcp)
-Administrator → IdM (443/tcp)
-Administrator → AAP (443/tcp)
+Administrator -> Satellite (443/tcp)
+Administrator -> IdM (443/tcp)
+Administrator -> AAP (443/tcp via Gateway)
 ```
 
 ### Provisioning Traffic
 ```
-New Host → Satellite TFTP (69/udp)
-New Host → Satellite HTTP (80/tcp)
-New Host → Satellite HTTPS (443/tcp)
+New Host -> Satellite TFTP (69/udp)
+New Host -> Satellite HTTP (80/tcp)
+New Host -> Satellite HTTPS (443/tcp)
 ```
 
 ### Identity Traffic
 ```
-Service → IdM LDAP (389/tcp, 636/tcp)
-Service → IdM Kerberos (88/tcp, 88/udp)
-Service → IdM DNS (53/tcp, 53/udp)
+Service -> IdM LDAP (389/tcp, 636/tcp)
+Service -> IdM Kerberos (88/tcp, 88/udp)
+Service -> IdM DNS (53/tcp, 53/udp)
 ```
 
 ### Automation Traffic
 ```
-AAP → Target Hosts SSH (22/tcp)
-Satellite → Target Hosts SSH (22/tcp)
+AAP -> Target Hosts SSH (22/tcp)
+Satellite -> Target Hosts SSH (22/tcp)
 ```
 
 ### Security Traffic
 ```
-Clevis Client → Tang Server (8080/tcp)
-OSCAP Scanner → Target Hosts SSH (22/tcp)
+Clevis Client -> Tang Server (8080/tcp)
 ```
 
 ---
 
-**Last Updated**: 2026-04-29
+**Document Version**: 2.0
+**Last Updated**: 2026-10-16

@@ -2,6 +2,16 @@
 
 **Review Date**: 2026-04-30
 
+> **Historical Document (as of 2026-10-16)**: This review was generated on
+> 2026-04-30 by scanning repositories that included a third-party fork (RHIS/,
+> since deleted). Several repositories listed here do not exist
+> (rhis-builder-google-lz, rhis-builder-baremetal-init, rhis-builder-oscap,
+> rhis-builder-rhelupgrade, rhis-builder-discovery-remaster,
+> rhis-builder-provisioner, rhis-builder-project-template-files,
+> rhis-builder-role-template). Role counts and lint status have changed since
+> this review. See REPOSITORIES.md for current verified inventory. All repos
+> now have ansible-lint (100% coverage).
+
 ---
 
 ## Quick Reference Table

@@ -1,6 +1,11 @@
+---
+layout: default
+title: RHIS Architecture
+---
+
 # RHIS Architecture
 
-**Red Hat Infrastructure Standard - System Architecture**
+**Red Hat Infrastructure Standard — System Architecture**
 
 ---
 
@@ -16,20 +21,29 @@
 - [Security Architecture](#security-architecture)
 - [Network Architecture](#network-architecture)
 - [Data Flow](#data-flow)
+- [Scalability](#scalability)
+- [Disaster Recovery](#disaster-recovery)
+- [Future Roadmap](#future-roadmap)
 
 ---
 
 ## Overview
 
-RHIS is a comprehensive enterprise infrastructure deployment platform designed for multi-cloud and on-premise deployments with air-gap capability. The architecture follows a layered approach with strong separation of concerns and identity-first design.
+RHIS is an enterprise infrastructure deployment platform for multi-cloud, on-premise,
+and air-gapped environments. It automates the full lifecycle of Red Hat infrastructure:
+provisioning, identity, content management, configuration, security, and day-2 operations.
+
+The platform is implemented as a set of Ansible-based repositories (`rhis-builder-*`),
+packaged into a hermetic provisioner container for validated, reproducible deployment.
 
 ### Key Characteristics
 
-- **Hermetic Packaging**: All components bundled for validation and air-gap deployment
-- **Identity-Driven**: IdM integration throughout the stack
-- **Declarative**: Configuration as code via rhis-builder-inventory
-- **Multi-Cloud Native**: Abstracts cloud and on-premise differences
-- **Lifecycle Aware**: Covers provision, configure, secure, upgrade, and day-2 operations
+- **Hermetic Packaging**: All dependencies baked into a scanned, signed container image
+- **Identity-Driven**: IdM is the first service deployed; all components integrate with it
+- **Declarative**: Infrastructure defined as code in `rhis-builder-inventory`
+- **Satellite-Driven**: After bootstrap, Satellite provisions all infrastructure
+- **Air-Gap Ready**: Single container transfer for disconnected environments
+- **Multi-Platform**: Targets every compute resource Red Hat Satellite supports
 
 ---
 
@@ -37,66 +51,47 @@ RHIS is a comprehensive enterprise infrastructure deployment platform designed f
 
 ### 1. Hermetic Deployment
 
-**Principle**: All dependencies must be packaged within the deployment container.
+All dependencies are packaged within the provisioner container at build time.
 
-**Rationale**:
-- Enable validation and signing of complete stack
-- Support air-gap (disconnected) environments
-- Ensure reproducible deployments
-- Eliminate runtime external dependencies
-
-**Implementation**:
-- `rhis-provisioner-container` clones all component repos at build time
-- All binary, Python, and Ansible dependencies baked into base image
+- `rhis-provisioner-container` clones all component repos via `configure_rhis_builder.yml`
+- All Python packages, Ansible collections, and binary tools are baked into the base image
 - No runtime fetching of code or dependencies
+- The container is scanned, signed, and attested before push to quay.io
 
 ### 2. Identity-First Architecture
 
-**Principle**: Red Hat Identity Management is the first service deployed and all components integrate with it.
+Red Hat Identity Management is the first service deployed and all components integrate with it.
 
-**Rationale**:
-- Central authentication and authorization
-- Unified DNS management
-- Certificate authority for TLS/SSL
-- Kerberos for secure service communication
-- LDAP for user/group management
-
-**Implementation**:
-- IdM deployed immediately after landing zone
-- Satellite registered as IdM client with realm integration
-- All subsequent services use IdM for identity
+- IdM provides DNS (forward and reverse zones with dynamic updates)
+- IdM CA issues TLS certificates for all services
+- Kerberos provides service-to-service authentication
+- All hosts auto-enroll in IdM during provisioning
+- Satellite uses `realm-capsule` integration for automated IdM enrollment
 
 ### 3. Configuration as Code
 
-**Principle**: All infrastructure defined declaratively in version-controlled configuration.
+All infrastructure is defined declaratively in `rhis-builder-inventory`.
 
-**Rationale**:
-- Reproducible deployments
-- Audit trail for changes
-- Template-based customization
-- Environment-specific overrides
-
-**Implementation**:
-- `rhis-builder-inventory` as single source of truth
-- Ansible variable hierarchy (group_vars, host_vars)
-- Template-based deployment generation
-- Vault-encrypted secrets
+- `inventory_template/` contains the source-of-truth templates
+- `inventory_update.sh` renders per-deployment configurations
+- Rendered output goes to `deployments/<domain>/` — never edited directly
+- Secrets are vault-encrypted and preserved across regeneration
+- Git tracks all configuration changes
 
 ### 4. Satellite-Driven Provisioning
 
-**Principle**: After bootstrap, Satellite provisions all infrastructure.
+After the bootstrap phase (IdM + Satellite), Satellite provisions all subsequent infrastructure.
 
-**Rationale**:
-- Unified provisioning workflow
-- Multi-platform support (KVM, VMware, clouds)
-- Lifecycle management integration
-- Content management (RPMs, containers)
+- Hostgroups define each system type
+- Compute resources abstract the underlying platform
+- Provisioning templates are managed via GitOps (`rhis-builder-satellite-templates`)
+- Content views and lifecycle environments control what packages are available
+- The goal is to support every compute resource Satellite manages
 
-**Implementation**:
-- Hostgroups for each system type
-- Compute resources for all platforms
-- Provisioning templates in git (GitOps)
-- Integration with IdM for automated enrollment
+### 5. Component-Scoped Variables
+
+Variables use component-scoped prefixes (`satellite_`, `idm_`, `kvm_`, `platform_`),
+not role-scoped prefixes. All tasks use fully-qualified collection names (`ansible.builtin.*`).
 
 ---
 
@@ -104,35 +99,30 @@ RHIS is a comprehensive enterprise infrastructure deployment platform designed f
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│  Layer 5: Application Infrastructure                      │
+│  Layer 5: Application Infrastructure                       │
 │  Customer workloads, applications                          │
 └────────────────┬───────────────────────────────────────────┘
                  │
 ┌────────────────▼───────────────────────────────────────────┐
 │  Layer 4: Infrastructure Services                          │
-│  AAP, Keycloak, NBDE, ImageBuilder, OSCAP, YubiKey        │
+│  AAP, Keycloak, NBDE, Quay, Quadlet services, YubiKey     │
 └────────────────┬───────────────────────────────────────────┘
                  │
 ┌────────────────▼───────────────────────────────────────────┐
 │  Layer 3: Universal Provisioner (Satellite)                │
-│  - Compute resources (KVM, VMware, AWS, Azure, GCP)       │
-│  - Hostgroups for all system types                        │
-│  - Content management                                      │
-│  - Lifecycle management                                    │
+│  Compute resources, hostgroups, content management,        │
+│  lifecycle environments, provisioning templates            │
 └────────────────┬───────────────────────────────────────────┘
                  │
 ┌────────────────▼───────────────────────────────────────────┐
-│  Layer 2: Identity & DNS (IdM)                            │
-│  - Authentication & Authorization                          │
-│  - DNS (forward & reverse zones)                          │
-│  - Certificate Authority                                   │
-│  - Kerberos realm                                         │
+│  Layer 2: Identity & DNS (IdM)                             │
+│  Authentication, authorization, DNS, CA, Kerberos          │
 └────────────────┬───────────────────────────────────────────┘
                  │
 ┌────────────────▼───────────────────────────────────────────┐
-│  Layer 1: Compute Platform (Landing Zone)                 │
-│  AWS, Azure, GCP, KVM, Bare Metal                         │
-│  Minimal RHEL 9 hosts for IdM + Satellite                 │
+│  Layer 1: Compute Platform (Landing Zone)                  │
+│  Bare metal, KVM, VMware, AWS, Azure, and more             │
+│  Minimal RHEL hosts for IdM + Satellite bootstrap          │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -140,22 +130,25 @@ RHIS is a comprehensive enterprise infrastructure deployment platform designed f
 
 ## Deployment Flow
 
-### Phase 0: Landing Zone Preparation
+### Phase 0: Landing Zone
 
-**Goal**: Create minimal RHEL 9 environment for IdM and Satellite bootstrap.
+**Goal**: Create minimal RHEL hosts for IdM and Satellite bootstrap.
 
-**Repositories**:
-- `rhis-builder-aws-lz`
-- `rhis-builder-azure-lz`
-- `rhis-builder-google-lz`
-- `rhis-builder-kvm-lz`
-- `rhis-builder-baremetal-init`
+The landing zone abstraction supports any compute resource Satellite can manage.
+A landing zone may perform introspection (discover existing infrastructure),
+build (create infrastructure using certified Ansible collections), or both.
 
-**Outputs**:
-- Minimal RHEL 9 host for IdM primary server
-- Minimal RHEL 9 host for Satellite primary server
-- Network configuration (VPC/subnet in cloud, VLAN on-prem)
-- Initial connectivity and access
+**Current implementations**:
+- `rhis-builder-bootstrap-init` — bare metal (kickstart/OEMDRV generation)
+- `rhis-builder-kvm-lz` — KVM/libvirt
+- `rhis-builder-aws-lz` — Amazon Web Services
+- `rhis-builder-azure-lz` — Microsoft Azure
+
+**Target platforms** (matching Satellite compute resource support):
+bare metal, VMware, Hyper-V, Proxmox, KVM/libvirt, OpenStack,
+OpenShift Virtualization, AWS, Azure, GCP, and local cloud variants.
+
+**Output**: Minimal RHEL hosts with network connectivity for IdM and Satellite.
 
 ### Phase 1: Bootstrap Infrastructure
 
@@ -164,164 +157,157 @@ RHIS is a comprehensive enterprise infrastructure deployment platform designed f
 #### Step 1: Deploy IdM Primary
 
 **Repository**: `rhis-builder-idm`
+**Build script**: `build_idm_primary.sh`
 
-**Actions**:
 1. Install IdM server with integrated CA
-2. Configure DNS zones (forward and reverse)
-3. Create sample users, groups, host groups
-4. Configure sudo rules and commands
+2. Configure forward and reverse DNS zones
+3. Create users, groups, host groups
+4. Configure sudo rules and HBAC policies
 5. Establish Active Directory trusts (if required)
 6. Enable dynamic DNS updates
 
-**Outputs**:
-- Functional IdM server providing auth, authz, DNS
-- Kerberos realm established
-- DNS zones configured
-- Initial users and groups created
+**Output**: Functional IdM providing authentication, authorization, DNS,
+and certificate authority for the entire platform.
 
 #### Step 2: Deploy Satellite Primary
 
 **Repository**: `rhis-builder-satellite`
+**Build script**: `build_sat_primary.sh`
 
-**Actions**:
 1. Install Satellite server
 2. Register as IdM client
-3. Run `foreman-prepare-realm` to create `realm-capsule` user
-4. Create HTTP service principal in IdM
-5. Generate and install Satellite certificates from IdM CA
-6. Configure compute resources (KVM, VMware, AWS, Azure, GCP)
-7. Create compute profiles (small, medium, large)
-8. Define hostgroups for each rhis-builder-* system type
-9. Import provisioning templates from git
-10. Configure content views and lifecycle environments
+3. Run `foreman-prepare-realm` for automated host enrollment
+4. Create HTTP service principal and IdM CA certificates
+5. Configure compute resources
+6. Create compute profiles and hostgroups
+7. Import provisioning templates from git
+8. Configure content views and lifecycle environments
+9. Sync Red Hat content
 
-**Outputs**:
-- Functional Satellite server integrated with IdM
-- Compute resources configured for all platforms
-- Hostgroups ready for infrastructure provisioning
-- Satellite can provision all other infrastructure
+**Output**: Functional Satellite integrated with IdM, ready to provision
+all subsequent infrastructure.
 
 ### Phase 2: Infrastructure Services
 
-**Goal**: Deploy operational infrastructure services via Satellite.
+**Goal**: Deploy operational services via Satellite provisioning.
 
-**Provisioning Method**: All systems provisioned through Satellite using appropriate hostgroups.
+All systems are provisioned through Satellite using appropriate hostgroups,
+then configured via Ansible playbooks from the provisioner container.
 
-**Components**:
-- **Automation**: AAP (Ansible Automation Platform)
-- **Security**: NBDE (Tang servers), Keycloak, YubiKey, OSCAP
-- **Operations**: ImageBuilder, Day-2 Ops tooling
-- **Lifecycle**: Convert2RHEL, RHEL Upgrade automation
-
-**Process**:
-1. Select appropriate hostgroup in Satellite
-2. Define compute resource and profile
-3. Provision via Satellite
-4. System auto-enrolls in IdM
-5. Configuration applied via Ansible (from AAP or direct)
+**Components and build scripts**:
+- **AAP**: `build_aap_controller.sh` — Ansible Automation Platform (controller, gateway, hub, EDA)
+- **Satellite Capsules**: `build_sat_1_capsules_satellite_pre.sh` → `build_sat_2_capsules.sh` → `build_sat_3_capsules_satellite_post.sh`
+- **IdM Replicas**: `build_idm_replicas.sh`
+- **KVM Hypervisors**: `build_kvm_hosts.sh`
+- **Quadlet Services**: `build_quadlets.sh` — containerized services (Quay, log aggregation, etc.)
+- **NBDE**: Tang servers for network-bound disk encryption
+- **Keycloak**: Identity brokering (SAML/OAuth/OIDC)
+- **YubiKey**: Hardware token 2FA via IdM
 
 ### Phase 3: Application Infrastructure
 
-**Goal**: Provision customer workloads and applications.
-
-**Method**: Same Satellite-driven workflow with customer-defined hostgroups.
+**Goal**: Provision customer workloads using the same Satellite-driven workflow
+with customer-defined hostgroups and content views.
 
 ---
 
 ## Component Architecture
 
-### rhis-builder-inventory (Configuration Repository)
+### rhis-builder-inventory
 
-**Purpose**: Single source of truth for all infrastructure configuration.
+Single source of truth for all infrastructure configuration.
 
-**Structure**:
 ```
 rhis-builder-inventory/
-├── inventory_template/           # Templates for new deployments
-│   ├── group_vars/               # Template group variables
-│   ├── host_vars/                # Template host variables
-│   └── templates/                # Jinja2 templates
-├── inventory_basevars.yml        # Default base variables file
-├── inventory_update.sh           # Script to generate deployment config
-├── deployments/                  # Generated deployment configs
-│   └── <domain>/                 # Per-domain configuration
-│       ├── inventory/            # Ansible inventory
-│       ├── group_vars/           # Domain-specific group vars
-│       ├── host_vars/            # Domain-specific host vars
-│       ├── templates/            # Rendered templates
-│       ├── vault/                # Encrypted secrets (never regenerated)
-│       ├── external_tasks/       # Custom playbooks
-│       ├── files/                # Static files (OSCAP, etc.)
-│       └── vars/                 # Additional variable files
-├── vault_SAMPLES/                # Sample vault files
-│   └── rhis_builder_vault_SAMPLE.yml
-├── example.ca.24.sh              # Container launch helper (AAP 2.4)
-├── example.ca.25.sh              # Container launch helper (AAP 2.5)
-└── docs/                         # Documentation
+├── inventory_template/              # Source-of-truth templates
+│   ├── group_vars/                  # Template group variables
+│   │   ├── all/                     # Variables for all hosts
+│   │   ├── idm_primary/
+│   │   ├── idm_replicas/
+│   │   ├── imagebuilders/
+│   │   ├── keycloak_servers/
+│   │   ├── kvm_hypervisors/
+│   │   ├── platform_installer/
+│   │   ├── provisioner/
+│   │   └── quay_servers/
+│   ├── host_vars/                   # Template host variables
+│   │   ├── aapcontroller26/         # AAP 2.6 controller config
+│   │   ├── aapedacontroller26/
+│   │   ├── aaphub26/
+│   │   ├── capsule/
+│   │   ├── idm/
+│   │   ├── quadlet/
+│   │   ├── quay/
+│   │   └── satellite/
+│   ├── inventory/                   # Inventory template (inventory.j2)
+│   ├── templates/                   # Jinja2 templates (installer inventories, etc.)
+│   └── scripts/                     # Launcher template (template.25.sh.j2)
+├── inventory_basevars.yml           # Default base variables
+├── inventory_update.sh              # Renders templates into deployments/
+├── deployments/                     # Generated output (never edit directly)
+│   └── <domain>/
+│       ├── inventory/               # Rendered Ansible inventory
+│       ├── group_vars/              # Domain-specific group vars
+│       ├── host_vars/               # Domain-specific host vars (FQDN-based)
+│       ├── templates/               # Rendered templates
+│       ├── vault/                   # Encrypted secrets (preserved across regeneration)
+│       ├── vault_SAMPLES/           # Reference vault file
+│       ├── external_tasks/          # Custom playbooks
+│       ├── files/                   # Static files
+│       ├── vars/                    # Additional variables
+│       ├── scripts/                 # Generated launcher scripts
+│       └── logs/                    # Deployment logs
+└── docs/                            # IP addressing documentation
 ```
 
-**Consumption**:
-- Mounted into `rhis-provisioner-container` at runtime
-- All rhis-builder-* projects reference these configs via symlinks
+**Key workflow**: Edit `inventory_template/` → run `inventory_update.sh` →
+rendered output appears in `deployments/<domain>/`. The vault directory is
+preserved across regenerations.
 
-### rhis-provisioner-container (Execution Environment)
+### rhis-provisioner-container
 
-**Purpose**: Hermetic container aggregating all RHIS components.
+Hermetic container aggregating all RHIS components for deployment.
 
-**Base Image**: `quay.io/parmstro/rhis-base-9-2.5:latest`
-- RHEL UBI 9
-- Python dependencies
-- Ansible core + collections
-- Binary tools (podman, git, etc.)
+**Two-layer build**:
 
-**Build Process**:
-```dockerfile
-FROM quay.io/parmstro/rhis-base-9-2.5:latest
+1. **rhis-base** (built via `rhis_build_base.sh`):
+   - RHEL UBI 9/10 base
+   - Python dependencies (from `dnf_requirements.txt` — no `pip install`)
+   - Ansible core + all required collections
+   - Scanning tools (Grype, Trivy, ClamAV, Syft, cosign, KICS)
+   - Security hardening
 
-# Clone all rhis-builder-* repositories
-RUN git clone https://github.com/parmstro/rhis-builder-idm && \
-    git clone https://github.com/parmstro/rhis-builder-satellite && \
-    git clone https://github.com/parmstro/rhis-builder-nbde && \
-    # ... all 25 repositories
-    
-# Create unified vars structure
-RUN mkdir -p /opt/rhis/common_vars/{host_vars,group_vars,templates,vault,inventory}
+2. **rhis-provisioner** (built via `rhis_build_provisioner.sh`, layered on rhis-base):
+   - Clones all rhis-builder-* repos via `configure_rhis_builder.yml`
+     (uses `ansible.builtin.git`, not shell `git clone`)
+   - Creates symlinks from each project's config directories to mounted volumes
+   - Adds build/deploy helper scripts (`build_*.sh`)
+   - All repos available at `/rhis/rhis-builder-*/`
 
-# Symlink all project vars to common directory
-RUN for project in /opt/rhis/rhis-builder-*/; do \
-      ln -s /opt/rhis/common_vars/host_vars $project/host_vars; \
-      ln -s /opt/rhis/common_vars/group_vars $project/group_vars; \
-      # ... etc
-    done
+**Runtime mounts** (from rendered deployment directory):
 
-# Add helper scripts
-COPY scripts/* /usr/local/bin/
+| Container Path | Source |
+|---|---|
+| `/rhis/vars/external_inventory/` | `deployments/<domain>/inventory/` |
+| `/rhis/vars/group_vars/` | `deployments/<domain>/group_vars/` |
+| `/rhis/vars/host_vars/` | `deployments/<domain>/host_vars/` |
+| `/rhis/vars/vault/` | `deployments/<domain>/vault/` |
+| `/rhis/vars/templates/` | `deployments/<domain>/templates/` |
+| `/rhis/vars/vars/` | `deployments/<domain>/vars/` |
+| `/rhis/vars/files/` | `deployments/<domain>/files/` |
+| `/rhis/vars/external_tasks/` | `deployments/<domain>/external_tasks/` |
 
-ENTRYPOINT ["/bin/bash"]
-```
+**Launching**: Generated launcher scripts (e.g., `example.ca.25.sh`) call
+`run_container.sh` with the appropriate mount flags (`-e`, `-f`, `-g`, `-h`,
+`-i`, `-s`, `-t`, `-v` for each directory) and container image coordinates.
 
-**Runtime**:
-```bash
-# Generated launch scripts mount your deployment configuration
-# Use example.ca.25.sh for AAP 2.5+ or example.ca.24.sh for AAP 2.4
-./run_container.sh \
-  --secrets-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/vault \
-  --external-tasks-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/external_tasks \
-  --files-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/files \
-  --group-vars-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/group_vars \
-  --host-vars-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/host_vars \
-  --inventory-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/inventory \
-  --templates-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/templates \
-  --vars-dir ~/rhis/rhis-builder-inventory/deployments/example.ca/vars \
-  --ansible-ver 2.5
-```
+**Inside the container**: An operator runs individual build scripts
+(`build_idm_primary.sh`, `build_sat_primary.sh`, etc.) which invoke
+`ansible-playbook` with the mounted inventory. There is no single orchestration
+script — each phase is run deliberately by the operator.
 
-**Inside Container**:
-- All rhis-builder-* repositories available at `/rhis/rhis-builder-*/`
-- Inventory mounted at `/rhis/vars/external_inventory/`
-- Vault mounted at `/rhis/vars/vault/`
-- Helper scripts (build_*.sh, deploy_*.sh) in each repository
-- Everything needed for air-gap deployment
+Default inventory path: `/rhis/vars/external_inventory/inventory`
+Default user: `ansiblerunner`
 
 ---
 
@@ -329,232 +315,209 @@ ENTRYPOINT ["/bin/bash"]
 
 ### Variable Hierarchy
 
-Ansible variable precedence (highest to lowest):
+RHIS follows standard Ansible variable precedence. The key layers used:
 
-1. **Extra vars** (`-e` on command line)
-2. **Task vars** (in playbooks)
-3. **Block vars** (in playbooks)
-4. **Role vars** (in role/vars/main.yml)
-5. **Include vars** (explicitly loaded)
-6. **Set_facts** (registered variables)
-7. **Registered vars** (task outputs)
-8. **Play vars_files** (loaded at play level)
-9. **Play vars** (in playbook)
-10. **Host vars** (`host_vars/<hostname>/`)
-11. **Group vars** (`group_vars/<group>/`)
-12. **Role defaults** (`roles/<role>/defaults/main.yml`)
+- **Extra vars**: Passed via `-e` on the command line
+- **Host vars**: Per-host configuration in `host_vars/<hostname>/`
+- **Group vars**: Per-group configuration in `group_vars/<group>/`
+- **Role defaults**: Default values in `roles/<role>/defaults/main.yml`
 
-### RHIS Variable Structure
+### Variable Naming Convention
 
-```
-rhis-builder-inventory/
-└── deployments/example.ca/
-    ├── group_vars/
-    │   ├── all/                      # Variables for all hosts
-    │   │   ├── main.yml              # General settings
-    │   │   └── vault.yml             # Encrypted secrets
-    │   ├── containerhosts/           # Container host group
-    │   │   └── main.yml
-    │   ├── clevishosts/              # NBDE client group
-    │   │   └── main.yml
-    │   └── idmservers/               # IdM servers group
-    │       └── main.yml
-    └── host_vars/
-        ├── idm1.example.ca/          # IdM primary config
-        │   └── main.yml
-        ├── satellite1.example.ca/    # Satellite primary config
-        │   └── main.yml
-        └── tang1.example.ca/         # Tang server config
-            └── containers.yml
-```
-
-### Configuration Pattern
-
-**Role Variables**: All prefixed with role name to prevent collisions.
-
-```yaml
-# roles/tang_container/defaults/main.yml
-tang_container_containers: []
-tang_container_registry: "registry.redhat.io"
-
-# host_vars/tang1.example.ca/containers.yml
-tang_container_containers:
-  - name: "tang"
-    image: "rhel8/tang"
-    registry: "{{ registry_url }}"
-    # ...
-```
+Variables use **component-scoped prefixes**, not role-scoped:
+- `satellite_` for Satellite configuration
+- `idm_` for IdM configuration
+- `kvm_` for KVM hypervisor configuration
+- `platform_` for AAP platform configuration
+- `aap_` for AAP installer variables
 
 ### Secrets Management
 
-**Ansible Vault**: All secrets encrypted.
+Secrets are managed via Ansible Vault with a naming convention:
 
 ```yaml
-# group_vars/all/vault.yml (encrypted)
-vault_registry_username: "service_account"
-vault_registry_password: "secret_password"
-vault_idm_admin_password: "admin_secret"
+# vault file (encrypted)
+aap_admin_password_vault: "<encrypted>"
+aap_registry_username_vault: "<encrypted>"
 
-# group_vars/all/main.yml (references vault)
-registry_username: "{{ vault_registry_username }}"
-registry_password: "{{ vault_registry_password }}"
+# main vars (references vault)
+platform_installer_config:
+  aap_admin_password: "{{ aap_admin_password_vault }}"
+  aap_registry_username: "{{ aap_registry_username_vault }}"
 ```
+
+Vault files live in `deployments/<domain>/vault/` and are preserved when
+`inventory_update.sh` regenerates the deployment. A sample vault file
+is provided in `vault_SAMPLES/`.
+
+### Deployment Generation
+
+`inventory_update.sh` drives the rendering pipeline:
+1. Reads `inventory_basevars.yml` (or domain-specific basevars)
+2. Runs a containerized Ansible playbook (`inventory_update.yml`)
+3. Renders all Jinja2 templates from `inventory_template/`
+4. Produces the deployment directory with inventory, group_vars, host_vars,
+   templates, scripts, and configuration files
+5. Preserves the vault directory across regenerations
+
+Per-domain basevars files (e.g., `example.ca_inventory_basevars.yml`,
+`highside.example.ca_inventory_basevars.yml`) configure different deployments.
 
 ---
 
 ## Container Architecture
 
-### Hermetic Packaging
+### Build Pipeline
 
-**Goal**: Bundle everything needed for deployment in container.
+```
+Pre-build scan                Container build              Post-build scan
+(ansible-lint, ClamAV)  →  (Containerfile + playbook)  →  (Grype, Trivy, Syft)
+                                                                   │
+                                                                   ▼
+                                                         Policy enforcement
+                                                         (fail on critical CVE)
+                                                                   │
+                                                                   ▼
+                                                         cosign keyless signing
+                                                         (Sigstore/Fulcio/Rekor)
+                                                                   │
+                                                                   ▼
+                                                         SBOM + vulnerability attestation
+                                                                   │
+                                                                   ▼
+                                                         Push to quay.io
+```
 
-**Benefits**:
-1. **Validation**: Test complete stack before deployment
-2. **Signing**: Sign validated container image
-3. **Air-Gap**: Transfer single container to disconnected environment
-4. **Reproducibility**: Identical environment every deployment
+**Build scripts**: `rhis_build_base.sh` (base image), `rhis_build_provisioner.sh` (provisioner layer)
 
-### Build-Time vs Runtime
+**Scan configuration**: `scan_base_pre_build.yml`, `scan_base_post_build.yml`,
+`scan_provisioner_pre_build.yml`, `scan_provisioner_post_build.yml`
 
-**Build Time** (in connected environment):
-- Clone all git repositories
-- Install all Python packages
-- Install all Ansible collections
-- Download all binary dependencies
-- Create helper scripts
+**IaC scanning**: `scan_kics_iac.yml` for infrastructure-as-code analysis
 
-**Runtime** (potentially disconnected):
-- Mount inventory configuration
-- Execute deployments
-- No external fetches required
+**Accepted risks**: `scan_accepted_risks.yml` tracks CVEs with documented
+rationale, fix-available tracking, and review-by dates. Reconciled automatically
+from scan results.
+
+**Build artifacts**: Single directory per build (`scan-reports/build-ubi{ver}-{timestamp}/`)
+containing all scan reports, SBOMs, and logs.
+
+**Base image verification**: Base image signatures are verified before
+provisioner builds proceed.
 
 ### Air-Gap Transfer
 
 ```bash
-# In connected environment
-podman save quay.io/parmstro/rhis-provisioner-9:latest -o rhis-provisioner.tar
+# Connected environment: save the signed container
+podman save quay.io/parmstro/rhis-provisioner:latest -o rhis-provisioner.tar
 
-# Transfer rhis-provisioner.tar via physical media
+# Transfer via physical media (diode pattern)
 
-# In disconnected environment
+# Disconnected environment: load and verify
 podman load -i rhis-provisioner.tar
-podman run -it -v /inventory:/opt/rhis/inventory:Z rhis-provisioner-9:latest
 ```
+
+The provisioner container contains everything needed for deployment.
+Inventory configuration is mounted from the host at runtime.
 
 ---
 
 ## Security Architecture
 
-### Defense in Depth
+### Container Supply Chain
 
-**Layer 1: Identity & Access**
-- IdM provides central authentication
-- Kerberos for service-to-service auth
-- LDAP for user/group management
-- 2FA with YubiKey (rhis-builder-yubi)
+- **Pre-build**: ansible-lint (safety profile), ClamAV malware scan
+- **Post-build**: Trivy vulnerability scan, Grype vulnerability scan, Syft SBOM generation
+- **Signing**: cosign keyless signing via Sigstore (Fulcio certificates, Rekor transparency log)
+- **Attestation**: SBOM attestation and vulnerability scan attestation attached to image
+- **Policy**: Builds blocked on unaccepted critical/high CVEs
+- **IaC scanning**: KICS for Ansible playbook security analysis
 
-**Layer 2: Network**
-- Firewall rules via firewalld
-- SELinux enforcement on all systems
-- Network segmentation (DMZ, internal, management)
+### Identity & Certificates
 
-**Layer 3: Encryption**
-- NBDE for disk encryption (rhis-builder-nbde)
-- TLS/SSL via IdM CA
-- Encrypted communication between services
+- IdM CA issues TLS certificates for all services
+- `platform_node_pre` role generates per-host certificates via `ipa cert-request`
+- Certificates stored at `/etc/ipa/private/<fqdn>/` on each host
+- `certmonger` tracks renewal
+- `custom_ca_cert` points at `/etc/ipa/ca.crt` for trust chain
 
-**Layer 4: Compliance**
-- OSCAP scanning (rhis-builder-oscap)
-- CIS RHEL 9 hardening
-- Continuous compliance monitoring
+### Encryption
 
-**Layer 5: Secrets Management**
-- Ansible Vault for secrets
-- No secrets in git (encrypted only)
-- Satellite credentials in IdM
+- NBDE (Network Bound Disk Encryption) via Tang/Clevis for automated disk unlock
+- Ansible Vault for secrets at rest
+- TLS for all service communication
 
-### Security Services
+### Authentication
 
-**NBDE (Network Bound Disk Encryption)**:
-- Tang servers for key escrow
-- Clevis clients for automated unlock
-- Boot-time decryption without manual intervention
+- Kerberos for service-to-service authentication
+- YubiKey hardware tokens for 2FA via IdM
+- Keycloak for application identity brokering (SAML/OAuth/OIDC)
 
-**Keycloak**:
-- Identity broker for applications
-- SAML/OAuth/OIDC support
-- Integration with IdM
+### Compliance
 
-**OSCAP**:
-- Security compliance scanning
-- CIS benchmark implementation
-- Remediation automation
-
-**YubiKey**:
-- Hardware token authentication
-- IdM integration
-- 2FA for privileged access
+- Token/credential cleanup is mandatory in container builds
+- `ansible.cfg` is redacted at end of build
+- No `pip install` — all Python dependencies via RHEL RPM packages
 
 ---
 
 ## Network Architecture
 
-### DNS Architecture
+### DNS
 
 **Primary DNS**: Red Hat Identity Management
 
-**Zones**:
-- Forward zones: `example.ca`, subdomains
-- Reverse zones: PTR records for all networks
-- Dynamic DNS: Satellite-provisioned hosts auto-register
+- Forward zones for each environment domain
+- Reverse zones with PTR records for all subnets
+- Dynamic DNS: Satellite-provisioned hosts auto-register via realm integration
+- External forwarders for internet resolution (connected environments)
 
-**Integration**:
-- Satellite updates DNS via realm-capsule user
-- All hosts resolve via IdM DNS
-- External forwarders for internet resolution
+### Lab Environments
 
-### Network Segmentation (Typical)
+| Environment | Subnet | Domain | Purpose |
+|---|---|---|---|
+| Primary Dev | 192.168.140.0/22 | example.ca | Development source of truth |
+| Disconnected | 192.168.240.0/22 | highside.example.ca | Air-gapped testing, no internet |
+| Production Demo | 192.168.252.0/22 | parmstrong.ca | Demo network with AD integration |
 
-```
-┌─────────────────────────────────────────────────┐
-│  DMZ / Public Zone                              │
-│  - Web frontends                                │
-│  - Public APIs                                  │
-└────────────────┬────────────────────────────────┘
-                 │ Firewall
-┌────────────────▼────────────────────────────────┐
-│  Application Zone                               │
-│  - Application servers                          │
-│  - Keycloak                                     │
-└────────────────┬────────────────────────────────┘
-                 │ Firewall
-┌────────────────▼────────────────────────────────┐
-│  Infrastructure Zone                            │
-│  - IdM                                          │
-│  - Satellite                                    │
-│  - AAP                                          │
-│  - NBDE Tang servers                           │
-└────────────────┬────────────────────────────────┘
-                 │ Firewall
-┌────────────────▼────────────────────────────────┐
-│  Management Zone                                │
-│  - Provisioner access                           │
-│  - Bastion hosts                                │
-└─────────────────────────────────────────────────┘
-```
+**Routing**: OPNsense router provides internet gateway, inter-subnet routing,
+and DHCP per subnet. Connected environments (example.ca, parmstrong.ca) can
+reach each other. Highside is isolated — content synced via diode pattern.
 
-### Firewall Configuration
+**Shared services** (192.168.252.0/22): 3 stratum 1 time servers accessible
+from all subnets.
 
-**Default Deny**: All zones start with deny-all, explicit allows only.
+### IP Addressing Scheme
 
-**Example** (Tang server):
-```yaml
-firewall:
-  - port: "8080/tcp"
-    zone: "public"
-    state: enabled
-    permanent: true
-```
+The inventory uses a band-based allocation scheme within each subnet:
+
+| Band | Offsets | Purpose |
+|---|---|---|
+| 10-29 | IdM | Primary + replicas |
+| 30-39 | Core services | Provisioner, Satellite, log server |
+| 40-49 | Capsules | Satellite capsules |
+| 50-59 | AAP Gateways | Gateway nodes |
+| 60-69 | AAP Controllers | Controller + platform installer |
+| 70-79 | AAP EDA | Event-Driven Ansible |
+| 80-94 | VMware | vCenter + ESXi hosts |
+| 100-109 | AAP Hubs | Automation Hub |
+| 110-119 | AAP Databases | Dedicated database servers |
+| 120-129 | Execution Nodes | AAP execution nodes |
+| 130-139 | Hop Nodes | AAP hop nodes |
+| 140-149 | KVM Hypervisors | Bare metal hypervisors |
+| 150-159 | Quay | Container registry |
+| 160-179 | Quadlet | Quadlet container hosts |
+
+The .x0 address in each band is reserved for emergency use.
+
+### Per-Environment Hardware
+
+Each environment is a self-contained datacenter chassis:
+- 14 NUC systems (7 VMware hypervisors + 7 bare metal)
+- 3 backplane NUCs (provisioner + IdM primary + Satellite primary)
+- VMware vCenter across the 7 hypervisor nodes
+- Synology NAS on managed switch providing iSCSI storage for VMware
+- Internal unmanaged switch + upstream managed switch
 
 ---
 
@@ -563,84 +526,44 @@ firewall:
 ### Provisioning Flow
 
 ```
-┌──────────────────┐
-│  Admin launches  │
-│  rhis-provisioner│
-│  container       │
-└────────┬─────────┘
+Operator launches provisioner container
          │
          ▼
-┌──────────────────┐
-│  Container reads │
-│  inventory from  │
-│  mounted volume  │
-└────────┬─────────┘
+Container reads inventory from mounted volume
          │
          ▼
-┌──────────────────┐
-│  Ansible playbook│
-│  targets Satellite│
-└────────┬─────────┘
+Operator runs build script (e.g., build_sat_primary.sh)
          │
          ▼
-┌──────────────────┐
-│  Satellite       │
-│  provisions host │
-│  via compute     │
-│  resource        │
-└────────┬─────────┘
+ansible-playbook targets the component (main.yml)
          │
          ▼
-┌──────────────────┐
-│  New host boots  │
-│  runs kickstart  │
-│  auto-enrolls in │
-│  IdM             │
-└────────┬─────────┘
+Satellite provisions host via compute resource
          │
          ▼
-┌──────────────────┐
-│  Configuration   │
-│  applied via     │
-│  Ansible (AAP)   │
-└──────────────────┘
+New host boots, runs kickstart, auto-enrolls in IdM
+         │
+         ▼
+Configuration applied via Ansible from the provisioner container
+(or later via AAP job templates)
 ```
 
 ### Identity Flow
 
 ```
-┌──────────────────┐
-│  User attempts   │
-│  to access       │
-│  service         │
-└────────┬─────────┘
+Service request arrives
          │
          ▼
-┌──────────────────┐
-│  Service checks  │
-│  IdM for auth    │
-│  (Kerberos/LDAP) │
-└────────┬─────────┘
+Service authenticates via IdM (Kerberos/LDAP)
          │
          ▼
-┌──────────────────┐
-│  IdM validates   │
-│  credentials     │
-│  (+ 2FA if req)  │
-└────────┬─────────┘
+IdM validates credentials (+ 2FA if configured)
          │
          ▼
-┌──────────────────┐
-│  Service checks  │
-│  authorization   │
-│  (groups, sudo)  │
-└────────┬─────────┘
+Authorization checked (groups, HBAC, sudo rules)
          │
          ▼
-┌──────────────────┐
-│  Access granted  │
-│  or denied       │
-└──────────────────┘
+Access granted or denied
 ```
 
 ---
@@ -649,27 +572,21 @@ firewall:
 
 ### Horizontal Scaling
 
-**IdM Replicas**:
-- Deploy additional IdM servers as replicas
-- Multi-master replication
-- Geographic distribution
+- **IdM**: Multi-master replicas for geographic distribution and redundancy
+- **Satellite**: Capsules for remote sites (content caching, proxying, load distribution)
+- **AAP**: Automation mesh with execution nodes and hop nodes for distributed capacity
 
-**Satellite Capsules**:
-- Deploy Satellite Capsules for remote sites
-- Content caching and proxying
-- Load distribution
+### Topology Modes
 
-**AAP**:
-- Automation mesh for distributed execution
-- Execution nodes for capacity
+RHIS supports multiple AAP topologies via inventory configuration:
 
-### Vertical Scaling
+- **Growth**: All AAP components on a single controller host (current lab topology)
+- **Enterprise**: Dedicated hosts per component (gateway, controller, hub, EDA, database)
 
-**Compute Profiles**:
-- Small: 2 vCPU, 4GB RAM
-- Medium: 4 vCPU, 8GB RAM
-- Large: 8 vCPU, 16GB RAM
-- Custom: As needed
+In growth mode, inventory groups (`aap_gateways`, `aap_hubs`, `aap_edacontroller`,
+`aap_databases`) fall back to the controller host. In enterprise mode, each group
+resolves to its own dedicated host. SSL certificate paths automatically adapt —
+each component references its own inventory group.
 
 ---
 
@@ -677,67 +594,47 @@ firewall:
 
 ### Backup Strategy
 
-**IdM**:
-- `ipa-backup` for full backup
-- Database dumps
-- Replica promotion capability
-
-**Satellite**:
-- `satellite-maintain backup`
-- Content on separate volumes
-- Database backups
-
-**Configuration**:
-- Git repository backups (rhis-builder-inventory)
-- Vault password secure storage
+- **IdM**: `ipa-backup`, replica promotion capability
+- **Satellite**: `satellite-maintain backup`, content on separate volumes
+- **Configuration**: Git-tracked in `rhis-builder-inventory`, vault password secured separately
+- **Containers**: Signed images in quay.io with SBOM attestation
 
 ### Recovery Strategy
 
-**IdM Loss**:
-- Restore from backup, or
-- Promote replica to primary
-
-**Satellite Loss**:
-- Restore from backup
-- Capsules can continue operations temporarily
-
-**Complete Site Loss**:
-- Rebuild from landing zone
-- Restore configs from git
-- Restore backups
+- **IdM loss**: Restore from backup or promote replica to primary
+- **Satellite loss**: Restore from backup; capsules continue operations temporarily
+- **Complete site loss**: Rebuild from landing zone, restore configs from git, restore backups
+- **Disconnected environment**: Drift report from connected agent drives diode sync content
 
 ---
 
-## Monitoring & Observability
+## Future Roadmap
 
-### Integration Points
+### In Progress
 
-- **Satellite**: Built-in reporting and metrics
-- **IdM**: Healthcheck and monitoring
-- **AAP**: Job execution tracking
-- **Infrastructure**: Can integrate Prometheus, Grafana, etc.
+- **Autonomous agent**: Read-only monitoring agent on the provisioner detecting drift,
+  build staleness, and configuration inconsistency across environments. Write-capable
+  phase after trust is established through accurate reporting.
+- **Log aggregation**: Loki + Grafana on a dedicated host via the quadlet deployment pattern,
+  with rsyslog forwarding via system role.
+- **KVM iSCSI storage**: Shared storage on Synology NAS for low-criticality VMs.
 
-### Logging
+### Planned
 
-- Centralized logging (optional integration)
-- Audit logs in IdM
-- Satellite provisioning logs
-- AAP job logs
-
----
-
-## Future Considerations
-
-### Potential Enhancements
-
-1. **Service Mesh**: Istio/OpenShift Service Mesh integration
-2. **GitOps**: ArgoCD/FluxCD for continuous deployment
-3. **Observability**: Full Prometheus/Grafana/Loki stack
-4. **Multi-Region**: Geographic distribution patterns
-5. **Collection Format**: Migrate to Ansible Collections
+- **Monorepo consolidation**: Consolidate `rhis-builder-*` repos into a single repository.
+  ELISE upstream project for CentOS Stream/FreeIPA/Foreman/AWX community equivalent.
+- **Deployment versioning**: Version per deployment (schema + inventory_update run count
+  + timestamp), surfaced on Satellite/IdM splash pages.
+- **Inventory tailoring**: Per-deployment overlays following the OpenSCAP tailoring model,
+  with a Cockpit UI for SOE selection.
+- **EE testing regime**: Smoke tests, rollback capability, and version tagging for
+  Execution Environments (currently pulling latest with no gate).
+- **CVE/errata monitoring**: CSAF VEX API for pre-rebuild CVE checks, authenticated
+  Red Hat API + EDA for automated rebuild triggers.
+- **Landing zone expansion**: Implementations for all Satellite-supported compute resources.
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: 2026-04-29  
-**Author**: Claude Sonnet 4.5 (with parmstro)
+**Document Version**: 2.0
+**Last Updated**: 2026-10-16
+**Authors**: parmstro, Claude Opus 4.6

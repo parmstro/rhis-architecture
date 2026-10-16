@@ -2,27 +2,27 @@
 layout: default
 title: RHIS Architecture
 description: >-
-  Red Hat Infrastructure Standard - Multi-cloud enterprise infrastructure
-  deployment platform with hermetic packaging, identity-first design, and
-  complete lifecycle automation across AWS, Azure, GCP, KVM, and bare metal.
+  Red Hat Infrastructure Standard - Enterprise infrastructure deployment
+  platform with hermetic packaging, identity-first design, and complete
+  lifecycle automation across bare metal, KVM, AWS, Azure, and more.
 ---
 
 <div class="project-eyebrow">Red Hat Infrastructure Standard Documentation</div>
 
 # RHIS Architecture
 
-<div class="project-tagline">Multi-cloud enterprise infrastructure deployment platform with hermetic packaging, identity-first design, and lifecycle automation.</div>
+<div class="project-tagline">Enterprise infrastructure deployment platform with hermetic packaging, identity-first design, and lifecycle automation.</div>
 
-The Red Hat Infrastructure Standard (RHIS) is a comprehensive enterprise
-infrastructure deployment platform. It treats Red Hat Identity Management as
-the foundational identity layer, Red Hat Satellite as the universal provisioner,
-Red Hat Ansible Automation Platform as the universal automation layer
-and packages the entire deployment stack into a hermetic container for
-validation, signing, and air-gap deployment. RHIS integrates your Red Hat products into
-a integrated solution to deliver on the promise of Open Hybrid Cloud
+The Red Hat Infrastructure Standard (RHIS) is an enterprise infrastructure
+deployment platform. It treats Red Hat Identity Management as the foundational
+identity layer, Red Hat Satellite as the universal provisioner, and Red Hat
+Ansible Automation Platform as the universal automation layer, packaging the
+entire deployment stack into a hermetic container for validation, signing, and
+air-gap deployment. RHIS integrates your Red Hat products into an integrated
+solution to deliver on the promise of Open Hybrid Cloud.
 
-Current architecture version: `1.0`  
-Total repositories: `25`
+Current architecture version: `2.0`  
+Total repositories: `28`
 
 ## Start Here
 
@@ -50,12 +50,17 @@ Pick the lane that matches your need:
     <tr>
       <td>Finding which repository does what</td>
       <td><a href="REPOSITORIES.html"><kbd>REPOSITORY INVENTORY</kbd></a></td>
-      <td>Complete catalog of all 25 components with status and dependencies.</td>
+      <td>Complete catalog of all 28 repositories with status and dependencies.</td>
     </tr>
     <tr>
       <td>Understanding component relationships</td>
       <td><a href="DEPENDENCIES.html"><kbd>DEPENDENCY GRAPH</kbd></a></td>
       <td>Shows deploy order, integration points, and critical path.</td>
+    </tr>
+    <tr>
+      <td>Adopting RHIS in your organization</td>
+      <td><a href="ADOPTION_MODEL.html"><kbd>ADOPTION MODEL</kbd></a></td>
+      <td>SOE principles, adoption phases, and organizational alignment.</td>
     </tr>
     <tr>
       <td>Contributing code or improvements</td>
@@ -65,7 +70,7 @@ Pick the lane that matches your need:
     <tr>
       <td>Visual architecture overview</td>
       <td><a href="diagrams/"><kbd>ARCHITECTURE DIAGRAMS</kbd></a></td>
-      <td>Five detailed Mermaid diagrams showing flows and relationships.</td>
+      <td>Mermaid diagrams showing flows and relationships.</td>
     </tr>
   </tbody>
 </table>
@@ -88,23 +93,21 @@ The critical deployment path that must be followed in order:
 
 | Phase | Component | Purpose | Duration |
 | --- | --- | --- | --- |
-| 0 | Preparation | Generate config, set up credentials, obtain subscriptions | 1-4 hours |
-| 1 | Landing Zone | Create minimal RHEL 9 hosts for IdM and Satellite | 15-30 min |
-| 2 | IdM Primary | Deploy identity, DNS, CA, Kerberos - **FIRST SERVICE** | 15-30 min |
-| 3 | Satellite | Deploy universal provisioner - **SECOND SERVICE** | 30-60 min |
-| 4+ | Services | Deploy all other infrastructure (can parallelize) | 10-20 min each |
+| 1 | Bootstrap | Create provisioner, IdM primary, Satellite primary | Varies |
+| 2 | Registration | Register IdM and provisioner to Satellite | 15-30 min |
+| 3 | Validation | Test compute resources, verify provisioning | 30-60 min |
+| 4 | AAP | Deploy and configure Ansible Automation Platform | 30-60 min |
+| 5 | Infrastructure | IdM replicas, security services, capsules (per location) | 10-20 min each |
+| 6 | Workloads | Application deployments via AAP job templates | Varies |
 
-After Satellite is deployed, all other services provision in parallel through Satellite.
-NOTE: Satellite synchronization time is hightly dependent on your selected content, the 
-horse power of your Satellite Primary, and the network bandwidth available to the system.
-It can range from 10h for an late generation Intel NUC system with 64GB of RAM, 2TB NVMe 
-and only a 1Gb connection disk pulling RHEL 7, 8, 9 and 10 ... To as fast as 30m for 
-64-core DELL server with 256GB of RAM, SAN storage and a trunked 100Gb network connection. 
-Your mileage will vary! 
+Satellite synchronization time depends on selected content, hardware, and
+network bandwidth. It can range from 30 minutes on a high-spec server with
+fast storage and 100Gb networking, to 10+ hours on a NUC with 1Gb connection.
 
 ## Platform Support
 
-RHIS deploys across five platform types with unified workflow:
+RHIS targets every compute resource Red Hat Satellite supports. Current
+implementation status:
 
 <table>
   <thead>
@@ -112,46 +115,40 @@ RHIS deploys across five platform types with unified workflow:
       <th>Platform</th>
       <th>Landing Zone Repo</th>
       <th>Status</th>
-      <th>Use When</th>
     </tr>
   </thead>
   <tbody>
     <tr>
+      <td>Bare Metal</td>
+      <td><a href="https://github.com/parmstro/rhis-builder-bootstrap-init">rhis-builder-bootstrap-init</a></td>
+      <td>Active</td>
+    </tr>
+    <tr>
+      <td>KVM / libvirt</td>
+      <td><a href="https://github.com/parmstro/rhis-builder-kvm-lz">rhis-builder-kvm-lz</a></td>
+      <td>Active</td>
+    </tr>
+    <tr>
       <td>AWS</td>
       <td><a href="https://github.com/parmstro/rhis-builder-aws-lz">rhis-builder-aws-lz</a></td>
-      <td>✅ Active</td>
-      <td>Deploying to Amazon Web Services</td>
+      <td>Active (not in container build)</td>
     </tr>
     <tr>
       <td>Azure</td>
       <td><a href="https://github.com/parmstro/rhis-builder-azure-lz">rhis-builder-azure-lz</a></td>
-      <td>✅ Active</td>
-      <td>Deploying to Microsoft Azure</td>
+      <td>Active</td>
     </tr>
     <tr>
-      <td>GCP</td>
-      <td><a href="https://github.com/parmstro/rhis-builder-google-lz">rhis-builder-google-lz</a></td>
-      <td>✅ Active</td>
-      <td>Deploying to Google Cloud Platform</td>
-    </tr>
-    <tr>
-      <td>KVM</td>
-      <td><a href="https://github.com/parmstro/rhis-builder-kvm-lz">rhis-builder-kvm-lz</a></td>
-      <td>✅ Active</td>
-      <td>On-premise libvirt/KVM hypervisors</td>
-    </tr>
-    <tr>
-      <td>Bare Metal</td>
-      <td><a href="https://github.com/parmstro/rhis-builder-baremetal-init">rhis-builder-baremetal-init</a></td>
-      <td>✅ Active</td>
-      <td>Physical servers with IPMI/BMC</td>
+      <td>VMware, GCP, Hyper-V, Proxmox, OpenStack, OCP Virt, Azure Local</td>
+      <td>—</td>
+      <td>Planned</td>
     </tr>
   </tbody>
 </table>
 
 ## Repository Categories
 
-All 25 RHIS repositories organized by function:
+All 28 RHIS repositories organized by function:
 
 <table>
   <thead>
@@ -167,43 +164,49 @@ All 25 RHIS repositories organized by function:
       <td>Core Foundation</td>
       <td>2</td>
       <td>Configuration repository and execution container</td>
-      <td><a href="REPOSITORIES.html#core-foundation-2-repositories">Details</a></td>
+      <td><a href="REPOSITORIES.html#core-foundation">Details</a></td>
     </tr>
     <tr>
       <td>Landing Zones</td>
-      <td>5</td>
-      <td>Bootstrap minimal RHEL hosts on each platform</td>
-      <td><a href="REPOSITORIES.html#landing-zones-5-repositories">Details</a></td>
+      <td>4</td>
+      <td>Bootstrap minimal RHEL hosts (3 cloud/hypervisor + 1 bare metal)</td>
+      <td><a href="REPOSITORIES.html#landing-zones">Details</a></td>
     </tr>
     <tr>
-      <td>Bootstrap Infrastructure</td>
-      <td>6</td>
-      <td>IdM and Satellite deployment (deploy FIRST)</td>
-      <td><a href="REPOSITORIES.html#core-infrastructure-services-6-repositories">Details</a></td>
+      <td>Core Infrastructure</td>
+      <td>3</td>
+      <td>IdM, Satellite, Satellite templates</td>
+      <td><a href="REPOSITORIES.html#core-infrastructure-services">Details</a></td>
     </tr>
     <tr>
       <td>Automation Platform</td>
-      <td>3</td>
+      <td>2</td>
       <td>AAP deployment and operational pipelines</td>
-      <td><a href="REPOSITORIES.html#automation-platform-3-repositories">Details</a></td>
+      <td><a href="REPOSITORIES.html#automation-platform">Details</a></td>
     </tr>
     <tr>
-      <td>Security & Identity</td>
-      <td>4</td>
-      <td>NBDE, Keycloak, YubiKey, OSCAP</td>
-      <td><a href="REPOSITORIES.html#security--identity-4-repositories">Details</a></td>
+      <td>Infrastructure Services</td>
+      <td>7</td>
+      <td>NBDE, Keycloak, YubiKey, Quay, Quadlet, KVM, OCP</td>
+      <td><a href="REPOSITORIES.html#infrastructure-services">Details</a></td>
     </tr>
     <tr>
       <td>Lifecycle Management</td>
-      <td>4</td>
-      <td>Convert2RHEL, upgrades, imaging, day-2 ops</td>
-      <td><a href="REPOSITORIES.html#lifecycle-management-4-repositories">Details</a></td>
+      <td>3</td>
+      <td>convert2rhel, imagebuilder, day-2-ops</td>
+      <td><a href="REPOSITORIES.html#lifecycle-management">Details</a></td>
     </tr>
     <tr>
-      <td>Development Tools</td>
-      <td>3</td>
-      <td>Templates and utilities for new components</td>
-      <td><a href="REPOSITORIES.html#development-tools--templates-3-repositories">Details</a></td>
+      <td>Supporting</td>
+      <td>6</td>
+      <td>EE testbed, vault sample, UI, maintenance, architecture, MCP</td>
+      <td><a href="REPOSITORIES.html#supporting-repositories">Details</a></td>
+    </tr>
+    <tr>
+      <td>Adoption Model</td>
+      <td>1</td>
+      <td>RHISAM adoption model documentation</td>
+      <td><a href="REPOSITORIES.html#rhisam">Details</a></td>
     </tr>
   </tbody>
 </table>
@@ -226,21 +229,18 @@ All subsequent services integrate with IdM for identity.
 After IdM, Satellite is deployed **second** and becomes the universal provisioner:
 
 - Complete configuration of all Satellite components
-- Installation
-- Certificate creation
+- Installation and certificate creation
 - Manifest creation and installation
 - Content selection including custom content
-- Content security settings
 - Standard Operating Environment (SOE) definition, including:
   - Content Lifecycle, views, publication and promotion
   - Activation key and system purpose definition
-  - Hostgroup definiton
+  - Hostgroup definition
   - Provisioning configuration for any compute resource
   - Discovery configuration and rule generation
-  - Compliance Role import and SCAP scanning configuration
+  - Compliance role import and SCAP scanning configuration
 - Infrastructure Management and Network assignment
 - Integrates with IdM for automated enrollment
-- and more
 
 ### Hermetic Container Packaging
 
@@ -259,11 +259,11 @@ The `rhis-provisioner-container` bundles all repositories for:
 - Template-based deployment generation
 - Ansible Vault for secrets
 - Version-controlled configurations
-- Air gapped deployment pulls together content, container and configuration export.
+- Air-gapped deployment pulls together content, container, and configuration export
 
 ## Architecture Diagrams
 
-Five detailed Mermaid diagrams showing system architecture and flows:
+Mermaid diagrams showing system architecture and flows:
 
 <table>
   <thead>
@@ -281,12 +281,12 @@ Five detailed Mermaid diagrams showing system architecture and flows:
     </tr>
     <tr>
       <td><a href="diagrams/02-deployment-flow.html">Deployment Flow</a></td>
-      <td>Step-by-step deployment sequence with timeline</td>
+      <td>Step-by-step deployment sequence</td>
       <td>Planning and executing deployments</td>
     </tr>
     <tr>
       <td><a href="diagrams/03-dependency-graph.html">Dependency Graph</a></td>
-      <td>All 25 repositories with deploy order</td>
+      <td>All repositories with deploy order</td>
       <td>Understanding component relationships</td>
     </tr>
     <tr>
@@ -295,7 +295,7 @@ Five detailed Mermaid diagrams showing system architecture and flows:
       <td>Understanding air-gap deployment</td>
     </tr>
     <tr>
-      <td><a href="diagrams/05-integration-dataflow.html">Integration & Data Flow</a></td>
+      <td><a href="diagrams/05-integration-dataflow.html">Integration and Data Flow</a></td>
       <td>Service integrations and communication patterns</td>
       <td>Understanding how services interact</td>
     </tr>
@@ -308,7 +308,7 @@ RHIS delivers strongest value when:
 
 - IdM will be the identity source of truth
 - Satellite will manage the infrastructure lifecycle
-- Ansible Automation Platfrom delivers workflow/pipeline autoamtion
+- Ansible Automation Platform delivers workflow/pipeline automation
 - Multi-cloud or hybrid deployment is needed
 - Air-gap capability is required
 - Standardized, reproducible deployments are critical
@@ -316,9 +316,9 @@ RHIS delivers strongest value when:
 
 ## Getting Started
 
-1. **Plan**: Review [Architecture](ARCHITECTURE.html) and choose your [platform](DEPLOYMENT.html#phase-1-landing-zone)
-2. **Prepare**: Set up credentials, obtain subscriptions, generate [configuration](DEPLOYMENT.html#phase-0-preparation)
-3. **Deploy**: Follow [deployment guide](DEPLOYMENT.html) in order: Landing Zone → IdM → Satellite → Services
+1. **Plan**: Review [Architecture](ARCHITECTURE.html) and choose your platform
+2. **Prepare**: Set up credentials, obtain subscriptions, generate [configuration](DEPLOYMENT.html#quick-start)
+3. **Deploy**: Follow [deployment guide](DEPLOYMENT.html) in order
 4. **Validate**: Verify each phase before proceeding to next
 5. **Operate**: Use [day-2 operations](https://github.com/parmstro/rhis-builder-day-2-ops) for ongoing management
 
@@ -326,11 +326,10 @@ RHIS delivers strongest value when:
 
 - **Issues**: [Report issues](https://github.com/parmstro/rhis-architecture/issues) in appropriate repository
 - **Contributing**: Follow [contribution guidelines](CONTRIBUTING.html)
-- **Author**: parmstro, heatmiser, shawkingly, redbeard
+- **Author**: parmstro
 - **License**: GPL-3.0 (see individual repositories)
 
 ---
 
-**Current Documentation Version**: 1.0  
-**Last Updated**: 2026-04-29  
-**Platform Status**: Production-Ready
+**Current Documentation Version**: 2.0  
+**Last Updated**: 2026-10-16

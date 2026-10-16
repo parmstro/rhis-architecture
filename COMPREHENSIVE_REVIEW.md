@@ -6,6 +6,13 @@
 **Total Code**: ~1,500 YAML files, ~120 roles  
 **Review Duration**: 6 hours
 
+> **Historical Document (as of 2026-10-16)**: This review scanned repos that
+> included a third-party fork (RHIS/, since deleted) and listed several
+> non-existent repositories. Role counts, lint coverage, and scores have
+> changed significantly since this review. All Ansible repos now have
+> ansible-lint configuration (100% coverage). See REPOSITORIES.md for current
+> verified inventory.
+
 ---
 
 ## Executive Summary
