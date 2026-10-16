@@ -134,9 +134,13 @@ not role-scoped prefixes. All tasks use fully-qualified collection names (`ansib
 
 **Goal**: Create minimal RHEL hosts for IdM and Satellite bootstrap.
 
-The landing zone abstraction supports any compute resource Satellite can manage.
-A landing zone may perform introspection (discover existing infrastructure),
-build (create infrastructure using certified Ansible collections), or both.
+The landing zone abstraction is designed to create the underlying infrastructure components for an RHIS deployment to bootstrap from.
+The goal is to support a landing zone configurator for any compute resource that Satellite can then provision to. 
+The landing zone model in RHIS is a bit of a chicken and egg challenge. 
+Each landing zone becomes both a bootstrap source and a provisioning target.
+A landing zone may perform introspection (discover existing infrastructure),build (create infrastructure using certified Ansible collections), or both.
+It is not necessary to implement a landing zone through RHIS.
+A landing zone may be built or provide through other common deployment implementations, e.g. Azure provisioning templates, Terraform infrastructure provisioning, etc..
 
 **Current implementations**:
 - `rhis-builder-bootstrap-init` — bare metal (kickstart/OEMDRV generation)
