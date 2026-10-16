@@ -152,7 +152,9 @@ A landing zone may be built or provide through other common deployment implement
 bare metal, VMware, Hyper-V, Proxmox, KVM/libvirt, OpenStack,
 OpenShift Virtualization, AWS, Azure, GCP, and local cloud variants.
 
-**Output**: Minimal RHEL hosts with network connectivity for IdM and Satellite.
+**Output**: 
+- Network virtual switching, routing, cloud services, storage platforms necessary to bootstrap our first hosts.
+- The initial bootstrap instances for provisioner, idm and satellite.
 
 ### Phase 1: Bootstrap Infrastructure
 
