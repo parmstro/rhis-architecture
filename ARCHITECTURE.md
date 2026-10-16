@@ -86,7 +86,7 @@ After the bootstrap phase (IdM + Satellite), Satellite provisions all subsequent
 - Compute resources abstract the underlying platform
 - Provisioning templates are managed via GitOps (`rhis-builder-satellite-templates`)
 - Content views and lifecycle environments control what packages are available
-- The goal is to support every compute resource Satellite manages
+- System deployments to every compute resource Satellite manages
 
 ### 5. Component-Scoped Variables
 
